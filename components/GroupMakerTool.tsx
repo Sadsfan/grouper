@@ -283,7 +283,7 @@ export default function GroupMakerTool() {
           className="hidden"
         />
         <p className="text-sm text-gray-600 mt-2">
-          "CSV format: Name,Gender OR just Name (gender will be auto-detected or you'll be asked)"
+          "CSV format:Name,Gender OR just Name (gender will be auto-detected or you'll be asked)"
         </p>
       </div>
       
