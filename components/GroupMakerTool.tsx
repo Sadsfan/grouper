@@ -12,7 +12,6 @@ type Child = {
 type Group = {
   id: number;
   children: Child[];
-  targetSize: number;
 };
 
 type PendingChild = {
@@ -26,8 +25,7 @@ export default function GroupMakerTool() {
   const [gender, setGender] = useState('boy');
   const [children, setChildren] = useState<Child[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [numGroups, setNumGroups] = useState(3);
-  const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
+  const [groupSize, setGroupSize] = useState(4);
   const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
   const [showGenderModal, setShowGenderModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,7 +38,7 @@ export default function GroupMakerTool() {
     
     if (maleNames.includes(firstName)) return 'boy';
     if (femaleNames.includes(firstName)) return 'girl';
-    return null;
+    return null; // Return null for ambiguous names
   };
 
   const addChild = () => {
@@ -69,61 +67,20 @@ export default function GroupMakerTool() {
     }));
   };
 
-  const updateNumGroups = (newNumGroups: number) => {
-    setNumGroups(newNumGroups);
-    const newSizes = Array(newNumGroups).fill(4);
-    // Keep existing sizes where possible
-    for (let i = 0; i < Math.min(newNumGroups, groupSizes.length); i++) {
-      newSizes[i] = groupSizes[i];
-    }
-    setGroupSizes(newSizes);
-  };
-
-  const updateGroupSize = (groupIndex: number, size: number) => {
-    const newSizes = [...groupSizes];
-    newSizes[groupIndex] = size;
-    setGroupSizes(newSizes);
-  };
-
   const generateGroups = () => {
     if (children.length === 0) return;
 
-    const shuffledChildren = [...children].sort(() => Math.random() - 0.5);
+    const shuffled = [...children].sort(() => Math.random() - 0.5);
     const newGroups: Group[] = [];
-    let childIndex = 0;
-
-    // Create groups with specified sizes
-    for (let i = 0; i < numGroups; i++) {
-      const targetSize = groupSizes[i];
-      const groupChildren = shuffledChildren.slice(childIndex, childIndex + targetSize);
-      
-      if (groupChildren.length > 0) {
-        newGroups.push({
-          id: Date.now() + i,
-          children: groupChildren,
-          targetSize: targetSize
-        });
-        childIndex += targetSize;
-      }
-    }
-
-    // Handle any remaining children
-    if (childIndex < shuffledChildren.length) {
-      const remainingChildren = shuffledChildren.slice(childIndex);
-      if (newGroups.length > 0) {
-        // Distribute remaining children among existing groups
-        remainingChildren.forEach((child, index) => {
-          const groupIndex = index % newGroups.length;
-          newGroups[groupIndex].children.push(child);
-        });
-      }
+    
+    for (let i = 0; i < shuffled.length; i += groupSize) {
+      newGroups.push({
+        id: Date.now() + i,
+        children: shuffled.slice(i, i + groupSize)
+      });
     }
     
     setGroups(newGroups);
-  };
-
-  const getTotalTargetSize = () => {
-    return groupSizes.reduce((sum, size) => sum + size, 0);
   };
 
   const updatePendingGender = (id: number, newGender: string) => {
@@ -159,20 +116,23 @@ export default function GroupMakerTool() {
       const needsGenderAssignment: PendingChild[] = [];
 
       lines.forEach((line, index) => {
-        if (line.trim() && index > 0) {
+        if (line.trim() && index > 0) { // Skip header
           const parts = line.split(',').map(part => part.trim());
           const name = parts[0];
           
           if (name) {
             let childGender = null;
             
+            // Check if gender is provided in CSV
             if (parts[1] && (parts[1].toLowerCase() === 'girl' || parts[1].toLowerCase() === 'boy')) {
               childGender = parts[1].toLowerCase();
             } else {
+              // Try to detect gender
               childGender = detectGender(name);
             }
 
             if (childGender) {
+              // Gender detected automatically
               newChildren.push({
                 id: Date.now() + index,
                 name: name,
@@ -180,20 +140,23 @@ export default function GroupMakerTool() {
                 friends: []
               });
             } else {
+              // Needs manual assignment
               needsGenderAssignment.push({
                 id: Date.now() + index,
                 name: name,
-                gender: 'boy'
+                gender: 'boy' // Default for the modal
               });
             }
           }
         }
       });
 
+      // Add automatically detected children
       if (newChildren.length > 0) {
         setChildren(prev => [...prev, ...newChildren]);
       }
 
+      // Show modal for ambiguous names
       if (needsGenderAssignment.length > 0) {
         setPendingChildren(needsGenderAssignment);
         setShowGenderModal(true);
@@ -216,7 +179,7 @@ export default function GroupMakerTool() {
           <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <h3 className="text-xl font-semibold mb-4">Assign Genders</h3>
             <p className="text-gray-600 mb-4">
-              "These names couldn't be automatically identified. Please assign genders:"
+              These names couldn't be automatically identified. Please assign genders:
             </p>
             <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
               {pendingChildren.map((child) => (
@@ -283,7 +246,7 @@ export default function GroupMakerTool() {
           className="hidden"
         />
         <p className="text-sm text-gray-600 mt-2">
-          "CSV format:Name,Gender OR just Name (gender will be auto-detected or you'll be asked)"
+          CSV format: Name,Gender OR just Name (gender will be auto-detected or you'll be asked)
         </p>
       </div>
       
@@ -324,61 +287,28 @@ export default function GroupMakerTool() {
 
       {children.length > 0 && (
         <div className="mb-6 p-4 bg-purple-50 rounded-lg border">
-          <h2 className="text-xl font-semibold mb-4">Configure Groups</h2>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Number of Groups</label>
-            <input 
-              type="number" 
-              value={numGroups} 
-              onChange={(e) => updateNumGroups(parseInt(e.target.value) || 1)}
-              min="1"
-              max="15"
-              className="p-2 border rounded-lg"
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Individual Group Sizes</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {Array.from({ length: numGroups }, (_, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <label className="text-sm font-medium">Group {index + 1}:</label>
-                  <input 
-                    type="number" 
-                    value={groupSizes[index] || 4} 
-                    onChange={(e) => updateGroupSize(index, parseInt(e.target.value) || 1)}
-                    min="1"
-                    max="20"
-                    className="w-16 p-1 border rounded text-center"
-                  />
-                </div>
-              ))}
+          <h2 className="text-xl font-semibold mb-4">Generate Groups</h2>
+          <div className="flex items-center gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Group Size</label>
+              <input 
+                type="number" 
+                value={groupSize} 
+                onChange={(e) => setGroupSize(parseInt(e.target.value) || 4)}
+                min="2"
+                max="10"
+                className="p-2 border rounded-lg"
+              />
+            </div>
+            <div className="flex items-end">
+              <button 
+                onClick={generateGroups}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Generate Groups
+              </button>
             </div>
           </div>
-
-          <div className="mb-4 p-3 bg-white rounded border">
-            <div className="text-sm text-gray-600">
-              <strong>Summary:</strong> {numGroups} groups, total capacity: {getTotalTargetSize()} children
-              {children.length > getTotalTargetSize() && (
-                <span className="text-orange-600 ml-2">
-                  ({children.length - getTotalTargetSize()} children will be distributed among groups)
-                </span>
-              )}
-              {children.length < getTotalTargetSize() && (
-                <span className="text-blue-600 ml-2">
-                  ({getTotalTargetSize() - children.length} spots remaining)
-                </span>
-              )}
-            </div>
-          </div>
-
-          <button 
-            onClick={generateGroups}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            Generate Groups
-          </button>
         </div>
       )}
 
@@ -438,9 +368,7 @@ export default function GroupMakerTool() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {groups.map((group, index) => (
               <div key={group.id} className="p-4 bg-white rounded-lg border border-green-300">
-                <h4 className="font-semibold text-green-700 mb-2">
-                  Group {index + 1} ({group.children.length}/{group.targetSize})
-                </h4>
+                <h4 className="font-semibold text-green-700 mb-2">Group {index + 1}</h4>
                 <ul className="space-y-1">
                   {group.children.map(child => (
                     <li key={child.id} className="text-sm">
