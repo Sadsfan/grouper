@@ -179,7 +179,7 @@ export default function GroupMakerTool() {
           <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <h3 className="text-xl font-semibold mb-4">Assign Genders</h3>
             <p className="text-gray-600 mb-4">
-              These names couldn't be automatically identified. Please assign genders:
+              These names couldn&apos;t be automatically identified.
             </p>
             <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
               {pendingChildren.map((child) => (
@@ -246,7 +246,7 @@ export default function GroupMakerTool() {
           className="hidden"
         />
         <p className="text-sm text-gray-600 mt-2">
-          CSV format: Name,Gender OR just Name (gender will be auto-detected or you'll be asked)
+          CSV format: Name,Gender OR just Name (gender will be auto-detected or you&apos;ll be asked)
         </p>
       </div>
       
