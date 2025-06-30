@@ -85,7 +85,7 @@ export default function GroupMakerTool() {
         } else {
           alert('Invalid file format. Please upload a valid Group Maker JSON file.');
         }
-      } catch (error) {
+      } catch {
         alert('Error reading file. Please check the file format.');
       }
     };
