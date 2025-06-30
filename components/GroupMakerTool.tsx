@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 type Child = {
   id: number;
@@ -12,6 +12,7 @@ type Child = {
 type Group = {
   id: number;
   children: Child[];
+  targetSize: number;
 };
 
 type PendingChild = {
@@ -25,10 +26,145 @@ export default function GroupMakerTool() {
   const [gender, setGender] = useState('boy');
   const [children, setChildren] = useState<Child[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [groupSize, setGroupSize] = useState(4);
+  const [numGroups, setNumGroups] = useState(3);
+  const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
   const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
   const [showGenderModal, setShowGenderModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const exportFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load saved data on component mount
+  useEffect(() => {
+    const savedChildren = localStorage.getItem('groupMakerChildren');
+    if (savedChildren) {
+      try {
+        setChildren(JSON.parse(savedChildren));
+      } catch (error) {
+        console.error('Error loading saved children:', error);
+      }
+    }
+  }, []);
+
+  // Save children whenever the list changes
+  useEffect(() => {
+    if (children.length > 0) {
+      localStorage.setItem('groupMakerChildren', JSON.stringify(children));
+    }
+  }, [children]);
+
+  const clearAllData = () => {
+    if (confirm('Are you sure you want to clear all children? This cannot be undone.')) {
+      setChildren([]);
+      setGroups([]);
+      localStorage.removeItem('groupMakerChildren');
+    }
+  };
+
+  const downloadChildrenData = () => {
+    const dataStr = JSON.stringify(children, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'group-maker-children.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const uploadChildrenData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const jsonData = JSON.parse(e.target?.result as string);
+        if (Array.isArray(jsonData) && jsonData.every(child => child.name && child.gender)) {
+          setChildren(jsonData);
+          alert('Children data loaded successfully!');
+        } else {
+          alert('Invalid file format. Please upload a valid Group Maker JSON file.');
+        }
+      } catch (error) {
+        alert('Error reading file. Please check the file format.');
+      }
+    };
+    reader.readAsText(file);
+    if (event.target) event.target.value = '';
+  };
+
+  const exportGroupsAsCSV = () => {
+    if (groups.length === 0) {
+      alert('Please generate groups first before exporting.');
+      return;
+    }
+
+    let csvContent = 'Group,Child Name,Gender\n';
+    groups.forEach((group, groupIndex) => {
+      group.children.forEach(child => {
+        csvContent += `Group ${groupIndex + 1},${child.name},${child.gender}\n`;
+      });
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'group-assignments.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportGroupsAsText = () => {
+    if (groups.length === 0) {
+      alert('Please generate groups first before exporting.');
+      return;
+    }
+
+    let textContent = 'GROUP ASSIGNMENTS\n';
+    textContent += '='.repeat(50) + '\n\n';
+    
+    groups.forEach((group, index) => {
+      textContent += `GROUP ${index + 1} (${group.children.length}/${group.targetSize}):\n`;
+      textContent += '-'.repeat(30) + '\n';
+      group.children.forEach((child, childIndex) => {
+        textContent += `${childIndex + 1}. ${child.name} (${child.gender === 'boy' ? 'Boy' : 'Girl'})\n`;
+      });
+      textContent += '\n';
+    });
+
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'group-assignments.txt';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyGroupsToClipboard = () => {
+    if (groups.length === 0) {
+      alert('Please generate groups first before copying.');
+      return;
+    }
+
+    let textContent = 'GROUP ASSIGNMENTS\n';
+    textContent += '='.repeat(30) + '\n\n';
+    
+    groups.forEach((group, index) => {
+      textContent += `GROUP ${index + 1}:\n`;
+      group.children.forEach((child, childIndex) => {
+        textContent += `${childIndex + 1}. ${child.name} (${child.gender === 'boy' ? 'Boy' : 'Girl'})\n`;
+      });
+      textContent += '\n';
+    });
+
+    navigator.clipboard.writeText(textContent).then(() => {
+      alert('Groups copied to clipboard!');
+    }).catch(() => {
+      alert('Failed to copy to clipboard. Please try the download option instead.');
+    });
+  };
 
   const detectGender = (name: string) => {
     const maleNames = ['noah', 'kieran', 'edward', 'owen', 'drew', 'beau', 'eoin', 'euan', 'lorenzo', 'rory', 'cian', 'patryk'];
@@ -38,7 +174,7 @@ export default function GroupMakerTool() {
     
     if (maleNames.includes(firstName)) return 'boy';
     if (femaleNames.includes(firstName)) return 'girl';
-    return null; // Return null for ambiguous names
+    return null;
   };
 
   const addChild = () => {
@@ -67,20 +203,57 @@ export default function GroupMakerTool() {
     }));
   };
 
+  const updateNumGroups = (newNumGroups: number) => {
+    setNumGroups(newNumGroups);
+    const newSizes = Array(newNumGroups).fill(4);
+    for (let i = 0; i < Math.min(newNumGroups, groupSizes.length); i++) {
+      newSizes[i] = groupSizes[i];
+    }
+    setGroupSizes(newSizes);
+  };
+
+  const updateGroupSize = (groupIndex: number, size: number) => {
+    const newSizes = [...groupSizes];
+    newSizes[groupIndex] = size;
+    setGroupSizes(newSizes);
+  };
+
   const generateGroups = () => {
     if (children.length === 0) return;
 
-    const shuffled = [...children].sort(() => Math.random() - 0.5);
+    const shuffledChildren = [...children].sort(() => Math.random() - 0.5);
     const newGroups: Group[] = [];
-    
-    for (let i = 0; i < shuffled.length; i += groupSize) {
-      newGroups.push({
-        id: Date.now() + i,
-        children: shuffled.slice(i, i + groupSize)
-      });
+    let childIndex = 0;
+
+    for (let i = 0; i < numGroups; i++) {
+      const targetSize = groupSizes[i];
+      const groupChildren = shuffledChildren.slice(childIndex, childIndex + targetSize);
+      
+      if (groupChildren.length > 0) {
+        newGroups.push({
+          id: Date.now() + i,
+          children: groupChildren,
+          targetSize: targetSize
+        });
+        childIndex += targetSize;
+      }
+    }
+
+    if (childIndex < shuffledChildren.length) {
+      const remainingChildren = shuffledChildren.slice(childIndex);
+      if (newGroups.length > 0) {
+        remainingChildren.forEach((child, index) => {
+          const groupIndex = index % newGroups.length;
+          newGroups[groupIndex].children.push(child);
+        });
+      }
     }
     
     setGroups(newGroups);
+  };
+
+  const getTotalTargetSize = () => {
+    return groupSizes.reduce((sum, size) => sum + size, 0);
   };
 
   const updatePendingGender = (id: number, newGender: string) => {
@@ -116,23 +289,20 @@ export default function GroupMakerTool() {
       const needsGenderAssignment: PendingChild[] = [];
 
       lines.forEach((line, index) => {
-        if (line.trim() && index > 0) { // Skip header
+        if (line.trim() && index > 0) {
           const parts = line.split(',').map(part => part.trim());
           const name = parts[0];
           
           if (name) {
             let childGender = null;
             
-            // Check if gender is provided in CSV
             if (parts[1] && (parts[1].toLowerCase() === 'girl' || parts[1].toLowerCase() === 'boy')) {
               childGender = parts[1].toLowerCase();
             } else {
-              // Try to detect gender
               childGender = detectGender(name);
             }
 
             if (childGender) {
-              // Gender detected automatically
               newChildren.push({
                 id: Date.now() + index,
                 name: name,
@@ -140,23 +310,20 @@ export default function GroupMakerTool() {
                 friends: []
               });
             } else {
-              // Needs manual assignment
               needsGenderAssignment.push({
                 id: Date.now() + index,
                 name: name,
-                gender: 'boy' // Default for the modal
+                gender: 'boy'
               });
             }
           }
         }
       });
 
-      // Add automatically detected children
       if (newChildren.length > 0) {
         setChildren(prev => [...prev, ...newChildren]);
       }
 
-      // Show modal for ambiguous names
       if (needsGenderAssignment.length > 0) {
         setPendingChildren(needsGenderAssignment);
         setShowGenderModal(true);
@@ -171,7 +338,39 @@ export default function GroupMakerTool() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold text-green-600 mb-6">Group Maker</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-green-600">Group Maker</h1>
+        <div className="flex gap-2">
+          <button
+            onClick={downloadChildrenData}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            disabled={children.length === 0}
+          >
+            💾 Save Data
+          </button>
+          <button
+            onClick={() => exportFileInputRef.current?.click()}
+            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          >
+            📁 Load Data
+          </button>
+          <button
+            onClick={clearAllData}
+            className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+            disabled={children.length === 0}
+          >
+            🗑️ Clear All
+          </button>
+        </div>
+      </div>
+
+      <input
+        ref={exportFileInputRef}
+        type="file"
+        accept=".json"
+        onChange={uploadChildrenData}
+        className="hidden"
+      />
       
       {/* Gender Assignment Modal */}
       {showGenderModal && (
@@ -179,7 +378,7 @@ export default function GroupMakerTool() {
           <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <h3 className="text-xl font-semibold mb-4">Assign Genders</h3>
             <p className="text-gray-600 mb-4">
-              These names couldn&apos;t be automatically identified.
+              These names couldn&apos;t be automatically identified. Please assign genders:
             </p>
             <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
               {pendingChildren.map((child) => (
@@ -287,34 +486,67 @@ export default function GroupMakerTool() {
 
       {children.length > 0 && (
         <div className="mb-6 p-4 bg-purple-50 rounded-lg border">
-          <h2 className="text-xl font-semibold mb-4">Generate Groups</h2>
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Group Size</label>
-              <input 
-                type="number" 
-                value={groupSize} 
-                onChange={(e) => setGroupSize(parseInt(e.target.value) || 4)}
-                min="2"
-                max="10"
-                className="p-2 border rounded-lg"
-              />
-            </div>
-            <div className="flex items-end">
-              <button 
-                onClick={generateGroups}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                Generate Groups
-              </button>
+          <h2 className="text-xl font-semibold mb-4">Configure Groups</h2>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Number of Groups</label>
+            <input 
+              type="number" 
+              value={numGroups} 
+              onChange={(e) => updateNumGroups(parseInt(e.target.value) || 1)}
+              min="1"
+              max="15"
+              className="p-2 border rounded-lg"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Individual Group Sizes</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {Array.from({ length: numGroups }, (_, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <label className="text-sm font-medium">Group {index + 1}:</label>
+                  <input 
+                    type="number" 
+                    value={groupSizes[index] || 4} 
+                    onChange={(e) => updateGroupSize(index, parseInt(e.target.value) || 1)}
+                    min="1"
+                    max="20"
+                    className="w-16 p-1 border rounded text-center"
+                  />
+                </div>
+              ))}
             </div>
           </div>
+
+          <div className="mb-4 p-3 bg-white rounded border">
+            <div className="text-sm text-gray-600">
+              <strong>Summary:</strong> {numGroups} groups, total capacity: {getTotalTargetSize()} children
+              {children.length > getTotalTargetSize() && (
+                <span className="text-orange-600 ml-2">
+                  ({children.length - getTotalTargetSize()} children will be distributed among groups)
+                </span>
+              )}
+              {children.length < getTotalTargetSize() && (
+                <span className="text-blue-600 ml-2">
+                  ({getTotalTargetSize() - children.length} spots remaining)
+                </span>
+              )}
+            </div>
+          </div>
+
+          <button 
+            onClick={generateGroups}
+            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            Generate Groups
+          </button>
         </div>
       )}
 
       {children.length > 0 && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">Children ({children.length}):</h3>
+          <h3 className="text-lg font-semibold mb-4">Children ({children.length}) - Auto-saved ✅:</h3>
           <div className="space-y-4">
             {children.map((child, index) => (
               <div key={child.id} className="p-3 bg-white rounded border">
@@ -364,11 +596,35 @@ export default function GroupMakerTool() {
 
       {groups.length > 0 && (
         <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <h3 className="text-xl font-semibold mb-4 text-green-800">Generated Groups:</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-green-800">Generated Groups:</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={copyGroupsToClipboard}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              >
+                📋 Copy
+              </button>
+              <button 
+                onClick={exportGroupsAsCSV}
+                className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+              >
+                📊 CSV
+              </button>
+              <button 
+                onClick={exportGroupsAsText}
+                className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+              >
+                📄 Text
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {groups.map((group, index) => (
               <div key={group.id} className="p-4 bg-white rounded-lg border border-green-300">
-                <h4 className="font-semibold text-green-700 mb-2">Group {index + 1}</h4>
+                <h4 className="font-semibold text-green-700 mb-2">
+                  Group {index + 1} ({group.children.length}/{group.targetSize})
+                </h4>
                 <ul className="space-y-1">
                   {group.children.map(child => (
                     <li key={child.id} className="text-sm">
