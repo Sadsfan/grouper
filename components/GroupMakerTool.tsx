@@ -722,55 +722,94 @@ export default function GroupMakerTool() {
         </div>
       )}
 
-      {groups.length > 0 && (
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-green-800">Generated Groups:</h3>
-            <div className="flex gap-2">
-              <button 
-                onClick={copyGroupsToClipboard}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-              >
-                📋 Copy
-              </button>
-              <button 
-                onClick={exportGroupsAsCSV}
-                className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-              >
-                📊 CSV
-              </button>
-              <button 
-                onClick={exportGroupsAsText}
-                className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
-              >
-                📄 Text
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {groups.map((group, index) => (
-              <div key={group.id} className="p-4 bg-white rounded-lg border border-green-300">
-                <h4 className="font-semibold text-green-700 mb-2">
-                  Group {index + 1} ({group.children.length}/{group.targetSize})
-                </h4>
-                <ul className="space-y-1">
-                  {group.children.map(child => (
-                    <li key={child.id} className="text-sm">
-                      {child.name} ({child.gender === 'boy' ? '👦' : '👧'})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-          <button 
-            onClick={generateGroups}
-            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Regenerate Groups
-          </button>
-        </div>
-      )}
+{groups.length > 0 && (
+  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-xl font-semibold text-green-800">Generated Groups - Drag & Drop to Rearrange:</h3>
+      <div className="flex gap-2">
+        <button 
+          onClick={copyGroupsToClipboard}
+          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >
+          📋 Copy
+        </button>
+        <button 
+          onClick={exportGroupsAsCSV}
+          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+        >
+          📊 CSV
+        </button>
+        <button 
+          onClick={exportGroupsAsText}
+          className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+        >
+          📄 Text
+        </button>
+      </div>
     </div>
-  );
-}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {groups.map((group, index) => {
+        const isOverLimit = group.children.length > group.targetSize;
+        const isUnderTarget = group.children.length < group.targetSize;
+        
+        return (
+          <div 
+            key={group.id} 
+            className={`p-4 rounded-lg border-2 ${
+              isOverLimit 
+                ? 'bg-red-50 border-red-300' 
+                : isUnderTarget 
+                ? 'bg-yellow-50 border-yellow-300'
+                : 'bg-white border-green-300'
+            }`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const draggedChildId = parseInt(e.dataTransfer.getData('childId'));
+              const sourceGroupId = parseInt(e.dataTransfer.getData('sourceGroupId'));
+              moveChildBetweenGroups(draggedChildId, sourceGroupId, group.id);
+            }}
+          >
+            <h4 className={`font-semibold mb-2 ${
+              isOverLimit 
+                ? 'text-red-700' 
+                : isUnderTarget 
+                ? 'text-yellow-700'
+                : 'text-green-700'
+            }`}>
+              Group {index + 1} ({group.children.length}/{group.targetSize})
+              {isOverLimit && ' ⚠️ Over Limit'}
+              {isUnderTarget && ' ⚡ Under Target'}
+            </h4>
+            <ul className="space-y-1 min-h-[60px]">
+              {group.children.map((child, childIndex) => (
+                <li 
+                  key={child.id} 
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('childId', child.id.toString());
+                    e.dataTransfer.setData('sourceGroupId', group.id.toString());
+                  }}
+                  className="text-sm p-2 bg-white rounded border cursor-move hover:bg-gray-50 transition-colors"
+                >
+                  {childIndex + 1}. {child.name} ({child.gender === 'boy' ? '👦' : '👧'})
+                </li>
+              ))}
+              {group.children.length === 0 && (
+                <li className="text-sm text-gray-400 italic p-2 border-2 border-dashed border-gray-200 rounded">
+                  Drop children here
+                </li>
+              )}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+    <button 
+      onClick={generateGroups}
+      className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+    >
+      Regenerate Groups
+    </button>
+  </div>
+)}
