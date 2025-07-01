@@ -7,6 +7,7 @@ type Child = {
   name: string;
   gender: string;
   friends: string[];
+  keepApart: string[];
 };
 
 type Group = {
@@ -20,113 +21,7 @@ type PendingChild = {
   name: string;
   gender: string;
 };
-'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-
-// Create a client-only version of the groups display
-const ClientOnlyGroups = dynamic(() => Promise.resolve(GroupsDisplay), {
-  ssr: false,
-  loading: () => <p>Loading groups...</p>
-});
-
-// Extract the groups display into a separate component
-function GroupsDisplay({ groups, copyGroupsToClipboard, exportGroupsAsCSV, exportGroupsAsText, generateGroups, moveChildBetweenGroups }: any) {
-  if (groups.length === 0) return null;
-  
-  return (
-    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-semibold text-green-800">Generated Groups - Drag & Drop to Rearrange:</h3>
-        <div className="flex gap-3">
-          <button 
-            onClick={copyGroupsToClipboard}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-          >
-            📋 Copy
-          </button>
-          <button 
-            onClick={exportGroupsAsCSV}
-            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-          >
-            📊 CSV
-          </button>
-          <button 
-            onClick={exportGroupsAsText}
-            className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
-          >
-            📄 Text
-          </button>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {groups.map((group: any, index: number) => {
-          const isOverLimit = group.children.length > group.targetSize;
-          const isUnderTarget = group.children.length < group.targetSize;
-          
-          return (
-            <div 
-              key={group.id} 
-              className={`p-4 rounded-lg border-2 ${
-                isOverLimit 
-                  ? 'bg-red-50 border-red-300' 
-                  : isUnderTarget 
-                  ? 'bg-yellow-50 border-yellow-300'
-                  : 'bg-white border-green-300'
-              }`}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const draggedChildId = parseInt(e.dataTransfer.getData('childId'));
-                const sourceGroupId = parseInt(e.dataTransfer.getData('sourceGroupId'));
-                moveChildBetweenGroups(draggedChildId, sourceGroupId, group.id);
-              }}
-            >
-              <h4 className={`font-semibold mb-2 ${
-                isOverLimit 
-                  ? 'text-red-700' 
-                  : isUnderTarget 
-                  ? 'text-yellow-700'
-                  : 'text-green-700'
-              }`}>
-                Group {index + 1} ({group.children.length}/{group.targetSize})
-                {isOverLimit && ' ⚠️ Over Limit'}
-                {isUnderTarget && ' ⚡ Under Target'}
-              </h4>
-              <ul className="space-y-1 min-h-[60px]">
-                {group.children.map((child: any, childIndex: number) => (
-                  <li 
-                    key={child.id} 
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('childId', child.id.toString());
-                      e.dataTransfer.setData('sourceGroupId', group.id.toString());
-                    }}
-                    className="text-sm p-2 bg-white rounded border cursor-move hover:bg-gray-50 transition-colors"
-                  >
-                    {childIndex + 1}. {child.name} ({child.gender === 'boy' ? '👦' : '👧'})
-                  </li>
-                ))}
-                {group.children.length === 0 && (
-                  <li className="text-sm text-gray-400 italic p-2 border-2 border-dashed border-gray-200 rounded">
-                    Drop children here
-                  </li>
-                )}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-      <button 
-        onClick={generateGroups}
-        className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-      >
-        Regenerate Groups
-      </button>
-    </div>
-  );
-}
 export default function GroupMakerTool() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState('boy');
@@ -136,25 +31,32 @@ export default function GroupMakerTool() {
   const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
   const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
   const [showGenderModal, setShowGenderModal] = useState(false);
-  const [unlimitedKeepApart, setUnlimitedKeepApart] = useState(false);
-
-// ADD THESE TWO LINES HERE:
-const [mounted, setMounted] = useState(false);
-
-useEffect(() => {
-  setMounted(true);
-}, []);
+  const [editingChild, setEditingChild] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Settings for friend/keep-apart limits
+  const [friendLimit, setFriendLimit] = useState(3);
+  const [keepApartLimit, setKeepApartLimit] = useState(2);
+  const [unlimitedFriends, setUnlimitedFriends] = useState(false);
+  const [unlimitedKeepApart, setUnlimitedKeepApart] = useState(false);
+
+  // Client-side mounting check
+  const [mounted, setMounted] = useState(false);
 
   // Load saved data on component mount
   useEffect(() => {
     const savedChildren = localStorage.getItem('groupMakerChildren');
     if (savedChildren) {
       try {
-        setChildren(JSON.parse(savedChildren));
-      } catch (error) {
-        console.error('Error loading saved children:', error);
+        const loadedChildren = JSON.parse(savedChildren);
+        const updatedChildren = loadedChildren.map((child: any) => ({
+          ...child,
+          keepApart: child.keepApart || []
+        }));
+        setChildren(updatedChildren);
+      } catch {
+        console.error('Error loading saved children');
       }
     }
   }, []);
@@ -166,6 +68,20 @@ useEffect(() => {
     }
   }, [children]);
 
+  // Client mounting check
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent hydration errors
+  if (!mounted) {
+    return (
+      <div className="p-6">
+        <h1 className="text-3xl font-bold text-green-600 mb-6">Group Maker</h1>
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
   const clearAllData = () => {
     if (confirm('Are you sure you want to clear all children? This cannot be undone.')) {
       setChildren([]);
@@ -194,7 +110,11 @@ useEffect(() => {
       try {
         const jsonData = JSON.parse(e.target?.result as string);
         if (Array.isArray(jsonData) && jsonData.every(child => child.name && child.gender)) {
-          setChildren(jsonData);
+          const updatedData = jsonData.map(child => ({
+            ...child,
+            keepApart: child.keepApart || []
+          }));
+          setChildren(updatedData);
           alert('Children data loaded successfully!');
         } else {
           alert('Invalid file format. Please upload a valid Group Maker JSON file.');
@@ -297,7 +217,8 @@ useEffect(() => {
         id: Date.now(),
         name: name.trim(),
         gender: gender,
-        friends: []
+        friends: [],
+        keepApart: []
       };
       setChildren([...children, newChild]);
       setName('');
@@ -310,11 +231,42 @@ useEffect(() => {
 
   const addFriend = (childId: number, friendName: string) => {
     setChildren(children.map(child => {
-      if (child.id === childId && !child.friends.includes(friendName)) {
-        return { ...child, friends: [...child.friends, friendName] };
+      if (child.id === childId) {
+        const maxFriends = unlimitedFriends ? 999 : friendLimit;
+        if (child.friends.length < maxFriends && !child.friends.includes(friendName)) {
+          return { ...child, friends: [...child.friends, friendName] };
+        }
       }
       return child;
     }));
+  };
+
+  const removeFriend = (childId: number, friendName: string) => {
+    setChildren(children.map(child => 
+      child.id === childId 
+        ? { ...child, friends: child.friends.filter(f => f !== friendName) }
+        : child
+    ));
+  };
+
+  const addKeepApart = (childId: number, personName: string) => {
+    setChildren(children.map(child => {
+      if (child.id === childId) {
+        const maxKeepApart = unlimitedKeepApart ? 999 : keepApartLimit;
+        if (child.keepApart.length < maxKeepApart && !child.keepApart.includes(personName)) {
+          return { ...child, keepApart: [...child.keepApart, personName] };
+        }
+      }
+      return child;
+    }));
+  };
+
+  const removeKeepApart = (childId: number, personName: string) => {
+    setChildren(children.map(child => 
+      child.id === childId 
+        ? { ...child, keepApart: child.keepApart.filter(p => p !== personName) }
+        : child
+    ));
   };
 
   const updateNumGroups = (newNumGroups: number) => {
@@ -332,172 +284,130 @@ useEffect(() => {
     setGroupSizes(newSizes);
   };
 
- const generateGroups = () => {
-  if (children.length === 0) return;
+  const generateGroups = () => {
+    if (children.length === 0) return;
 
-  // Smart algorithm that considers friends and keep-apart relationships
-  const remainingChildren = [...children];
-  const newGroups: Group[] = [];
-  
-  // Initialize empty groups
-  for (let i = 0; i < numGroups; i++) {
-    newGroups.push({
-  id: i,  // Use Math.random instead
-  children: groupChildren,
-  targetSize: targetSize
-});newGroups.push({
-      id: Date.now() + i,
-      children: [],
-      targetSize: groupSizes[i]
-    });
-  }
+    // Smart algorithm that considers friends and keep-apart relationships
+    const remainingChildren = [...children];
+    const newGroups: Group[] = [];
+    
+    // Initialize empty groups
+    for (let i = 0; i < numGroups; i++) {
+      newGroups.push({
+        id: i,
+        children: [],
+        targetSize: groupSizes[i]
+      });
+    }
 
-  // Helper function to check if two children should be kept apart
-  const shouldKeepApart = (child1: Child, child2: Child) => {
-    return child1.keepApart.includes(child2.name) || child2.keepApart.includes(child1.name);
-  };
+    // Helper function to check if two children should be kept apart
+    const shouldKeepApart = (child1: Child, child2: Child) => {
+      return child1.keepApart.includes(child2.name) || child2.keepApart.includes(child1.name);
+    };
 
-  // Helper function to check if two children are friends
-  const areFriends = (child1: Child, child2: Child) => {
-    return child1.friends.includes(child2.name) || child2.friends.includes(child1.name);
-  };
+    // Helper function to check if two children are friends
+    const areFriends = (child1: Child, child2: Child) => {
+      return child1.friends.includes(child2.name) || child2.friends.includes(child1.name);
+    };
 
-  // Helper function to find the best group for a child
-  const findBestGroupForChild = (child: Child) => {
-    let bestGroup = -1;
-    let bestScore = -1000;
+    // Helper function to find the best group for a child
+    const findBestGroupForChild = (child: Child) => {
+      let bestGroup = -1;
+      let bestScore = -1000;
 
-    for (let groupIndex = 0; groupIndex < newGroups.length; groupIndex++) {
-      const group = newGroups[groupIndex];
+      for (let groupIndex = 0; groupIndex < newGroups.length; groupIndex++) {
+        const group = newGroups[groupIndex];
+        
+        // Skip if group is full
+        if (group.children.length >= group.targetSize) continue;
+
+        let score = 0;
+        let canPlace = true;
+
+        // Check each child in the group
+        for (const groupChild of group.children) {
+          // Cannot place if they should be kept apart
+          if (shouldKeepApart(child, groupChild)) {
+            canPlace = false;
+            break;
+          }
+          
+          // Bonus points for friends
+          if (areFriends(child, groupChild)) {
+            score += 100;
+          }
+        }
+
+        if (!canPlace) continue;
+
+        // Prefer groups with more space relative to target
+        const spacePenalty = (group.children.length / group.targetSize) * 10;
+        score -= spacePenalty;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestGroup = groupIndex;
+        }
+      }
+
+      return bestGroup;
+    };
+
+    // Phase 1: Place children with friends first (prioritize friend groups)
+    const childrenWithFriends = remainingChildren.filter(child => child.friends.length > 0);
+    childrenWithFriends.sort((a, b) => b.friends.length - a.friends.length); // Most friends first
+
+    for (const child of childrenWithFriends) {
+      if (!remainingChildren.includes(child)) continue; // Already placed
+
+      const bestGroupIndex = findBestGroupForChild(child);
+      if (bestGroupIndex !== -1) {
+        newGroups[bestGroupIndex].children.push(child);
+        remainingChildren.splice(remainingChildren.indexOf(child), 1);
+      }
+    }
+
+    // Phase 2: Place remaining children
+    while (remainingChildren.length > 0) {
+      const child = remainingChildren[0];
+      const bestGroupIndex = findBestGroupForChild(child);
       
-      // Skip if group is full
-      if (group.children.length >= group.targetSize) continue;
-
-      let score = 0;
-      let canPlace = true;
-
-      // Check each child in the group
-      for (const groupChild of group.children) {
-        // Cannot place if they should be kept apart
-        if (shouldKeepApart(child, groupChild)) {
-          canPlace = false;
-          break;
-        }
-        
-        // Bonus points for friends
-        if (areFriends(child, groupChild)) {
-          score += 100;
-        }
+      if (bestGroupIndex !== -1) {
+        newGroups[bestGroupIndex].children.push(child);
+      } else {
+        // Force placement in least full group if no good match
+        const leastFullGroup = newGroups.reduce((min, group, index) => 
+          group.children.length < newGroups[min].children.length ? index : min, 0);
+        newGroups[leastFullGroup].children.push(child);
       }
-
-      if (!canPlace) continue;
-
-      // Prefer groups with more space relative to target
-      const spacePenalty = (group.children.length / group.targetSize) * 10;
-      score -= spacePenalty;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestGroup = groupIndex;
-      }
+      
+      remainingChildren.shift();
     }
 
-    return bestGroup;
-  };
-
-  // Phase 1: Place children with friends first (prioritize friend groups)
-  const childrenWithFriends = remainingChildren.filter(child => child.friends.length > 0);
-  childrenWithFriends.sort((a, b) => b.friends.length - a.friends.length); // Most friends first
-
-  for (const child of childrenWithFriends) {
-    if (!remainingChildren.includes(child)) continue; // Already placed
-
-    const bestGroupIndex = findBestGroupForChild(child);
-    if (bestGroupIndex !== -1) {
-      newGroups[bestGroupIndex].children.push(child);
-      remainingChildren.splice(remainingChildren.indexOf(child), 1);
-    }
-  }
-
-  // Phase 2: Place remaining children
-  while (remainingChildren.length > 0) {
-    const child = remainingChildren[0];
-    const bestGroupIndex = findBestGroupForChild(child);
+    setGroups(newGroups);
     
-    if (bestGroupIndex !== -1) {
-      newGroups[bestGroupIndex].children.push(child);
-    } else {
-      // Force placement in least full group if no good match
-      const leastFullGroup = newGroups.reduce((min, group, index) => 
-        group.children.length < newGroups[min].children.length ? index : min, 0);
-      newGroups[leastFullGroup].children.push(child);
-    }
+    // Show a summary of friend connections
+    let totalFriendConnections = 0;
+    let totalKeepApartViolations = 0;
     
-    remainingChildren.shift();
-  }
-
-  // Phase 3: Balance groups if needed (move children between groups to improve friend connections)
-  for (let iterations = 0; iterations < 5; iterations++) {
-    let improved = false;
-    
-    for (let i = 0; i < newGroups.length; i++) {
-      for (let j = i + 1; j < newGroups.length; j++) {
-        const group1 = newGroups[i];
-        const group2 = newGroups[j];
-        
-        // Try swapping children between groups to improve friend connections
-        for (const child1 of group1.children) {
-          for (const child2 of group2.children) {
-            // Calculate current friend scores
-            const currentScore1 = group1.children.filter(c => c !== child1 && areFriends(child1, c)).length;
-            const currentScore2 = group2.children.filter(c => c !== child2 && areFriends(child2, c)).length;
-            
-            // Calculate scores after swap
-            const newScore1 = group2.children.filter(c => c !== child2 && areFriends(child1, c)).length;
-            const newScore2 = group1.children.filter(c => c !== child1 && areFriends(child2, c)).length;
-            
-            // Check if swap would violate keep-apart rules
-            const wouldViolate1 = group2.children.some(c => c !== child2 && shouldKeepApart(child1, c));
-            const wouldViolate2 = group1.children.some(c => c !== child1 && shouldKeepApart(child2, c));
-            
-            // Swap if it improves friend connections and doesn't violate keep-apart
-            if (!wouldViolate1 && !wouldViolate2 && (newScore1 + newScore2) > (currentScore1 + currentScore2)) {
-              // Perform swap
-              group1.children[group1.children.indexOf(child1)] = child2;
-              group2.children[group2.children.indexOf(child2)] = child1;
-              improved = true;
-            }
+    newGroups.forEach(group => {
+      for (let i = 0; i < group.children.length; i++) {
+        for (let j = i + 1; j < group.children.length; j++) {
+          if (areFriends(group.children[i], group.children[j])) {
+            totalFriendConnections++;
+          }
+          if (shouldKeepApart(group.children[i], group.children[j])) {
+            totalKeepApartViolations++;
           }
         }
       }
-    }
+    });
     
-    if (!improved) break; // No more improvements possible
-  }
+    setTimeout(() => {
+      alert(`Groups generated! Friend connections: ${totalFriendConnections}, Keep-apart violations: ${totalKeepApartViolations}`);
+    }, 100);
+  };
 
-  setGroups(newGroups);
-  
-  // Show a summary of friend connections
-  let totalFriendConnections = 0;
-  let totalKeepApartViolations = 0;
-  
-  newGroups.forEach(group => {
-    for (let i = 0; i < group.children.length; i++) {
-      for (let j = i + 1; j < group.children.length; j++) {
-        if (areFriends(group.children[i], group.children[j])) {
-          totalFriendConnections++;
-        }
-        if (shouldKeepApart(group.children[i], group.children[j])) {
-          totalKeepApartViolations++;
-        }
-      }
-    }
-  });
-  
-  setTimeout(() => {
-    alert(`Groups generated! Friend connections: ${totalFriendConnections}, Keep-apart violations: ${totalKeepApartViolations}`);
-  }, 100);
-};
   const getTotalTargetSize = () => {
     return groupSizes.reduce((sum, size) => sum + size, 0);
   };
@@ -511,7 +421,8 @@ useEffect(() => {
   const confirmGenderAssignments = () => {
     const newChildren = pendingChildren.map(pending => ({
       ...pending,
-      friends: []
+      friends: [],
+      keepApart: []
     }));
     setChildren(prev => [...prev, ...newChildren]);
     setPendingChildren([]);
@@ -553,7 +464,8 @@ useEffect(() => {
                 id: Date.now() + index,
                 name: name,
                 gender: childGender,
-                friends: []
+                friends: [],
+                keepApart: []
               });
             } else {
               needsGenderAssignment.push({
@@ -581,62 +493,33 @@ useEffect(() => {
     reader.readAsText(file);
     if (event.target) event.target.value = '';
   };
-const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGroupId: number) => {
-  if (sourceGroupId === targetGroupId) return;
-
-  setGroups(prevGroups => {
-    const newGroups = prevGroups.map(group => ({ ...group, children: [...group.children] }));
-    
-    // Find the child and remove from source group
-    let movedChild: Child | null = null;
-    const sourceGroup = newGroups.find(g => g.id === sourceGroupId);
-    if (sourceGroup) {
-      const childIndex = sourceGroup.children.findIndex(c => c.id === childId);
-      if (childIndex !== -1) {
-        movedChild = sourceGroup.children[childIndex];
-        sourceGroup.children.splice(childIndex, 1);
-      }
-    }
-    
-    // Add to target group
-    if (movedChild) {
-      const targetGroup = newGroups.find(g => g.id === targetGroupId);
-      if (targetGroup) {
-        targetGroup.children.push(movedChild);
-      }
-    }
-    
-    return newGroups;
-
-  });
-};
   return (
     <div className="p-6">
-  <div className="flex items-center justify-between mb-6">
-  <h1 className="text-3xl font-bold text-green-600">Group Maker</h1>
-  <div className="flex gap-4">  {/* Changed from gap-2 to gap-4 */}
-    <button
-      onClick={downloadChildrenData}
-      className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"  {/* Added more padding */}
-      disabled={children.length === 0}
-    >
-      💾 Save Data
-    </button>
-    <button
-      onClick={() => exportFileInputRef.current?.click()}
-      className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"  {/* Added more padding */}
-    >
-      📁 Load Data
-    </button>
-    <button
-      onClick={clearAllData}
-      className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700"  {/* Added more padding */}
-      disabled={children.length === 0}
-    >
-      🗑️ Clear All
-    </button>
-  </div>
-</div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-green-600">Group Maker</h1>
+        <div className="flex gap-4">
+          <button
+            onClick={downloadChildrenData}
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            disabled={children.length === 0}
+          >
+            💾 Save Data
+          </button>
+          <button
+            onClick={() => exportFileInputRef.current?.click()}
+            className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          >
+            📁 Load Data
+          </button>
+          <button
+            onClick={clearAllData}
+            className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+            disabled={children.length === 0}
+          >
+            🗑️ Clear All
+          </button>
+        </div>
+      </div>
 
       <input
         ref={exportFileInputRef}
@@ -702,6 +585,81 @@ const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGr
           </div>
         </div>
       )}
+
+      {/* Settings Section */}
+      <div className="mb-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
+        <h2 className="text-xl font-semibold mb-4">Relationship Settings</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <div>
+            <h3 className="font-medium mb-3">Friends Settings</h3>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={unlimitedFriends}
+                  onChange={(e) => setUnlimitedFriends(e.target.checked)}
+                  className="mr-2"
+                />
+                Unlimited friends
+              </label>
+              {!unlimitedFriends && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Maximum friends per child: {friendLimit}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={friendLimit}
+                    onChange={(e) => setFriendLimit(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="text-xs text-gray-600 flex justify-between">
+                    <span>1</span>
+                    <span>10</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-3">Keep Apart Settings</h3>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={unlimitedKeepApart}
+                  onChange={(e) => setUnlimitedKeepApart(e.target.checked)}
+                  className="mr-2"
+                />
+                Unlimited keep-apart
+              </label>
+              {!unlimitedKeepApart && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Maximum keep-apart per child: {keepApartLimit}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={keepApartLimit}
+                    onChange={(e) => setKeepApartLimit(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="text-xs text-gray-600 flex justify-between">
+                    <span>1</span>
+                    <span>10</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
       
       <div className="mb-6 p-4 bg-yellow-50 rounded-lg border">
         <h2 className="text-xl font-semibold mb-4">Upload CSV</h2>
@@ -820,47 +778,129 @@ const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGr
 
       {children.length > 0 && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">Children ({children.length}) - Auto-saved ✅:</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            Children ({children.length}) - Auto-saved ✅
+            <span className="text-sm font-normal text-gray-600 ml-2">
+              Friends: {unlimitedFriends ? 'Unlimited' : friendLimit} | Keep Apart: {unlimitedKeepApart ? 'Unlimited' : keepApartLimit}
+            </span>
+          </h3>
           <div className="space-y-4">
             {children.map((child, index) => (
               <div key={child.id} className="p-3 bg-white rounded border">
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-medium">{index + 1}. {child.name} ({child.gender === 'boy' ? '👦 Boy' : '👧 Girl'})</span>
-                  <button 
-                    onClick={() => removeChild(child.id)}
-                    className="px-3 py-1 bg-red-100 text-red-800 rounded text-sm"
-                  >
-                    Remove
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingChild(editingChild === child.id ? null : child.id)}
+                      className="px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200"
+                    >
+                      {editingChild === child.id ? 'Done' : 'Edit'}
+                    </button>
+                    <button 
+                      onClick={() => removeChild(child.id)}
+                      className="px-3 py-1 bg-red-100 text-red-800 rounded text-sm hover:bg-red-200"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
                 
                 {child.friends.length > 0 && (
                   <div className="text-sm text-blue-600 mb-2">
-                    Friends: {child.friends.join(', ')}
+                    <span className="font-medium">Friends: </span>
+                    {child.friends.map((friend, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 mr-2">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {friend}
+                          {editingChild === child.id && (
+                            <button
+                              onClick={() => removeFriend(child.id, friend)}
+                              className="ml-1 text-blue-600 hover:text-blue-800"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {child.keepApart && child.keepApart.length > 0 && (
+                  <div className="text-sm text-red-600 mb-2">
+                    <span className="font-medium">Keep Apart: </span>
+                    {child.keepApart.map((person, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1 mr-2">
+                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
+                          {person}
+                          {editingChild === child.id && (
+                            <button
+                              onClick={() => removeKeepApart(child.id, person)}
+                              className="ml-1 text-red-600 hover:text-red-800"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      </span>
+                    ))}
                   </div>
                 )}
                 
-                <div className="text-sm">
-                  <label>Add friend:</label>
-                  <select 
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        addFriend(child.id, e.target.value);
-                        e.target.value = '';
+                <div className="flex gap-4 text-sm">
+                  <div>
+                    <label>Add friend:</label>
+                    <select 
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          addFriend(child.id, e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="ml-2 p-1 border rounded text-sm"
+                      disabled={!unlimitedFriends && child.friends.length >= friendLimit}
+                    >
+                      <option value="">Select friend...</option>
+                      {children
+                        .filter(c => c.id !== child.id && !child.friends.includes(c.name))
+                        .map(otherChild => (
+                          <option key={otherChild.id} value={otherChild.name}>
+                            {otherChild.name}
+                          </option>
+                        ))
                       }
-                    }}
-                    className="ml-2 p-1 border rounded text-sm"
-                  >
-                    <option value="">Select friend...</option>
-                    {children
-                      .filter(c => c.id !== child.id && !child.friends.includes(c.name))
-                      .map(otherChild => (
-                        <option key={otherChild.id} value={otherChild.name}>
-                          {otherChild.name}
-                        </option>
-                      ))
-                    }
-                  </select>
+                    </select>
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({child.friends.length}/{unlimitedFriends ? '∞' : friendLimit})
+                    </span>
+                  </div>
+
+                  <div>
+                    <label>Keep apart:</label>
+                    <select 
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          addKeepApart(child.id, e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="ml-2 p-1 border rounded text-sm"
+                      disabled={!unlimitedKeepApart && child.keepApart.length >= keepApartLimit}
+                    >
+                      <option value="">Select person...</option>
+                      {children
+                        .filter(c => c.id !== child.id && !child.keepApart.includes(c.name))
+                        .map(otherChild => (
+                          <option key={otherChild.id} value={otherChild.name}>
+                            {otherChild.name}
+                          </option>
+                        ))
+                      }
+                    </select>
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({child.keepApart.length}/{unlimitedKeepApart ? '∞' : keepApartLimit})
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -868,55 +908,55 @@ const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGr
         </div>
       )}
 
-{groups.length > 0 && (
-  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-xl font-semibold text-green-800">Generated Groups:</h3>
-      <div className="flex gap-2">
-        <button 
-          onClick={copyGroupsToClipboard}
-          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-        >
-          📋 Copy
-        </button>
-        <button 
-          onClick={exportGroupsAsCSV}
-          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-        >
-          📊 CSV
-        </button>
-        <button 
-          onClick={exportGroupsAsText}
-          className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
-        >
-          📄 Text
-        </button>
-      </div>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {groups.map((group, index) => (
-        <div key={index} className="p-4 bg-white rounded-lg border border-green-300">
-          <h4 className="font-semibold text-green-700 mb-2">
-            Group {index + 1} ({group.children.length}/{group.targetSize})
-          </h4>
-          <ul className="space-y-1">
-            {group.children.map((child, childIndex) => (
-              <li key={child.id} className="text-sm">
-                {childIndex + 1}. {child.name} ({child.gender === 'boy' ? '👦' : '👧'})
-              </li>
+      {groups.length > 0 && (
+        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-green-800">Generated Groups:</h3>
+            <div className="flex gap-2">
+              <button 
+                onClick={copyGroupsToClipboard}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              >
+                📋 Copy
+              </button>
+              <button 
+                onClick={exportGroupsAsCSV}
+                className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+              >
+                📊 CSV
+              </button>
+              <button 
+                onClick={exportGroupsAsText}
+                className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+              >
+                📄 Text
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {groups.map((group, index) => (
+              <div key={group.id} className="p-4 bg-white rounded-lg border border-green-300">
+                <h4 className="font-semibold text-green-700 mb-2">
+                  Group {index + 1} ({group.children.length}/{group.targetSize})
+                </h4>
+                <ul className="space-y-1">
+                  {group.children.map((child, childIndex) => (
+                    <li key={child.id} className="text-sm">
+                      {childIndex + 1}. {child.name} ({child.gender === 'boy' ? '👦' : '👧'})
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
+          <button 
+            onClick={generateGroups}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Regenerate Groups
+          </button>
         </div>
-      ))}
-    </div>
-    <button 
-      onClick={generateGroups}
-      className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-    >
-      Regenerate Groups
-    </button>
-  </div>
-)}
+      )}
 
     </div>
   );
