@@ -463,7 +463,34 @@ export default function GroupMakerTool() {
     reader.readAsText(file);
     if (event.target) event.target.value = '';
   };
+const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGroupId: number) => {
+  if (sourceGroupId === targetGroupId) return;
 
+  setGroups(prevGroups => {
+    const newGroups = prevGroups.map(group => ({ ...group, children: [...group.children] }));
+    
+    // Find the child and remove from source group
+    let movedChild: Child | null = null;
+    const sourceGroup = newGroups.find(g => g.id === sourceGroupId);
+    if (sourceGroup) {
+      const childIndex = sourceGroup.children.findIndex(c => c.id === childId);
+      if (childIndex !== -1) {
+        movedChild = sourceGroup.children[childIndex];
+        sourceGroup.children.splice(childIndex, 1);
+      }
+    }
+    
+    // Add to target group
+    if (movedChild) {
+      const targetGroup = newGroups.find(g => g.id === targetGroupId);
+      if (targetGroup) {
+        targetGroup.children.push(movedChild);
+      }
+    }
+    
+    return newGroups;
+  });
+};
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
