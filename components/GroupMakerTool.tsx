@@ -136,6 +136,14 @@ export default function GroupMakerTool() {
   const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
   const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
   const [showGenderModal, setShowGenderModal] = useState(false);
+  const [unlimitedKeepApart, setUnlimitedKeepApart] = useState(false);
+
+// ADD THESE TWO LINES HERE:
+const [mounted, setMounted] = useState(false);
+
+useEffect(() => {
+  setMounted(true);
+}, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -604,31 +612,31 @@ const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGr
 };
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-green-600">Group Maker</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={downloadChildrenData}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-            disabled={children.length === 0}
-          >
-            💾 Save Data
-          </button>
-          <button
-            onClick={() => exportFileInputRef.current?.click()}
-            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-          >
-            📁 Load Data
-          </button>
-          <button
-            onClick={clearAllData}
-            className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-            disabled={children.length === 0}
-          >
-            🗑️ Clear All
-          </button>
-        </div>
-      </div>
+  <div className="flex items-center justify-between mb-6">
+  <h1 className="text-3xl font-bold text-green-600">Group Maker</h1>
+  <div className="flex gap-4">  {/* Changed from gap-2 to gap-4 */}
+    <button
+      onClick={downloadChildrenData}
+      className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"  {/* Added more padding */}
+      disabled={children.length === 0}
+    >
+      💾 Save Data
+    </button>
+    <button
+      onClick={() => exportFileInputRef.current?.click()}
+      className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"  {/* Added more padding */}
+    >
+      📁 Load Data
+    </button>
+    <button
+      onClick={clearAllData}
+      className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700"  {/* Added more padding */}
+      disabled={children.length === 0}
+    >
+      🗑️ Clear All
+    </button>
+  </div>
+</div>
 
       <input
         ref={exportFileInputRef}
