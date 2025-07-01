@@ -69,19 +69,25 @@ export default function GroupMakerTool() {
   }, [children]);
 
   // Client mounting check
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+useEffect(() => {
+  setMounted(true);
+}, []);
 
-  // Prevent hydration errors
-  if (!mounted) {
-    return (
-      <div className="p-6">
+// Prevent hydration errors - more reliable method
+if (typeof window === 'undefined' || !mounted) {
+  return (
+    <div className="p-6">
+      <div className="animate-pulse">
         <h1 className="text-3xl font-bold text-green-600 mb-6">Group Maker</h1>
-        <div className="text-center">Loading...</div>
+        <div className="space-y-4">
+          <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+          <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+          <div className="h-4 bg-gray-300 rounded w-5/6"></div>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
   const clearAllData = () => {
     if (confirm('Are you sure you want to clear all children? This cannot be undone.')) {
       setChildren([]);
