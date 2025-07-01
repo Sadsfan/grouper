@@ -39,7 +39,7 @@ function GroupsDisplay({ groups, copyGroupsToClipboard, exportGroupsAsCSV, expor
     <div className="p-4 bg-green-50 rounded-lg border border-green-200">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-semibold text-green-800">Generated Groups - Drag & Drop to Rearrange:</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button 
             onClick={copyGroupsToClipboard}
             className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
@@ -909,3 +909,7 @@ const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGr
     </button>
   </div>
 )}
+
+    </div>
+  );
+}
