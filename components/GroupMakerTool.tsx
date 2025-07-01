@@ -218,40 +218,168 @@ export default function GroupMakerTool() {
     setGroupSizes(newSizes);
   };
 
-  const generateGroups = () => {
-    if (children.length === 0) return;
+ const generateGroups = () => {
+  if (children.length === 0) return;
 
-    const shuffledChildren = [...children].sort(() => Math.random() - 0.5);
-    const newGroups: Group[] = [];
-    let childIndex = 0;
+  // Smart algorithm that considers friends and keep-apart relationships
+  const remainingChildren = [...children];
+  const newGroups: Group[] = [];
+  
+  // Initialize empty groups
+  for (let i = 0; i < numGroups; i++) {
+    newGroups.push({
+      id: Date.now() + i,
+      children: [],
+      targetSize: groupSizes[i]
+    });
+  }
 
-    for (let i = 0; i < numGroups; i++) {
-      const targetSize = groupSizes[i];
-      const groupChildren = shuffledChildren.slice(childIndex, childIndex + targetSize);
+  // Helper function to check if two children should be kept apart
+  const shouldKeepApart = (child1: Child, child2: Child) => {
+    return child1.keepApart.includes(child2.name) || child2.keepApart.includes(child1.name);
+  };
+
+  // Helper function to check if two children are friends
+  const areFriends = (child1: Child, child2: Child) => {
+    return child1.friends.includes(child2.name) || child2.friends.includes(child1.name);
+  };
+
+  // Helper function to find the best group for a child
+  const findBestGroupForChild = (child: Child) => {
+    let bestGroup = -1;
+    let bestScore = -1000;
+
+    for (let groupIndex = 0; groupIndex < newGroups.length; groupIndex++) {
+      const group = newGroups[groupIndex];
       
-      if (groupChildren.length > 0) {
-        newGroups.push({
-          id: Date.now() + i,
-          children: groupChildren,
-          targetSize: targetSize
-        });
-        childIndex += targetSize;
+      // Skip if group is full
+      if (group.children.length >= group.targetSize) continue;
+
+      let score = 0;
+      let canPlace = true;
+
+      // Check each child in the group
+      for (const groupChild of group.children) {
+        // Cannot place if they should be kept apart
+        if (shouldKeepApart(child, groupChild)) {
+          canPlace = false;
+          break;
+        }
+        
+        // Bonus points for friends
+        if (areFriends(child, groupChild)) {
+          score += 100;
+        }
+      }
+
+      if (!canPlace) continue;
+
+      // Prefer groups with more space relative to target
+      const spacePenalty = (group.children.length / group.targetSize) * 10;
+      score -= spacePenalty;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestGroup = groupIndex;
       }
     }
 
-    if (childIndex < shuffledChildren.length) {
-      const remainingChildren = shuffledChildren.slice(childIndex);
-      if (newGroups.length > 0) {
-        remainingChildren.forEach((child, index) => {
-          const groupIndex = index % newGroups.length;
-          newGroups[groupIndex].children.push(child);
-        });
+    return bestGroup;
+  };
+
+  // Phase 1: Place children with friends first (prioritize friend groups)
+  const childrenWithFriends = remainingChildren.filter(child => child.friends.length > 0);
+  childrenWithFriends.sort((a, b) => b.friends.length - a.friends.length); // Most friends first
+
+  for (const child of childrenWithFriends) {
+    if (!remainingChildren.includes(child)) continue; // Already placed
+
+    const bestGroupIndex = findBestGroupForChild(child);
+    if (bestGroupIndex !== -1) {
+      newGroups[bestGroupIndex].children.push(child);
+      remainingChildren.splice(remainingChildren.indexOf(child), 1);
+    }
+  }
+
+  // Phase 2: Place remaining children
+  while (remainingChildren.length > 0) {
+    const child = remainingChildren[0];
+    const bestGroupIndex = findBestGroupForChild(child);
+    
+    if (bestGroupIndex !== -1) {
+      newGroups[bestGroupIndex].children.push(child);
+    } else {
+      // Force placement in least full group if no good match
+      const leastFullGroup = newGroups.reduce((min, group, index) => 
+        group.children.length < newGroups[min].children.length ? index : min, 0);
+      newGroups[leastFullGroup].children.push(child);
+    }
+    
+    remainingChildren.shift();
+  }
+
+  // Phase 3: Balance groups if needed (move children between groups to improve friend connections)
+  for (let iterations = 0; iterations < 5; iterations++) {
+    let improved = false;
+    
+    for (let i = 0; i < newGroups.length; i++) {
+      for (let j = i + 1; j < newGroups.length; j++) {
+        const group1 = newGroups[i];
+        const group2 = newGroups[j];
+        
+        // Try swapping children between groups to improve friend connections
+        for (const child1 of group1.children) {
+          for (const child2 of group2.children) {
+            // Calculate current friend scores
+            const currentScore1 = group1.children.filter(c => c !== child1 && areFriends(child1, c)).length;
+            const currentScore2 = group2.children.filter(c => c !== child2 && areFriends(child2, c)).length;
+            
+            // Calculate scores after swap
+            const newScore1 = group2.children.filter(c => c !== child2 && areFriends(child1, c)).length;
+            const newScore2 = group1.children.filter(c => c !== child1 && areFriends(child2, c)).length;
+            
+            // Check if swap would violate keep-apart rules
+            const wouldViolate1 = group2.children.some(c => c !== child2 && shouldKeepApart(child1, c));
+            const wouldViolate2 = group1.children.some(c => c !== child1 && shouldKeepApart(child2, c));
+            
+            // Swap if it improves friend connections and doesn't violate keep-apart
+            if (!wouldViolate1 && !wouldViolate2 && (newScore1 + newScore2) > (currentScore1 + currentScore2)) {
+              // Perform swap
+              group1.children[group1.children.indexOf(child1)] = child2;
+              group2.children[group2.children.indexOf(child2)] = child1;
+              improved = true;
+            }
+          }
+        }
       }
     }
     
-    setGroups(newGroups);
-  };
+    if (!improved) break; // No more improvements possible
+  }
 
+  setGroups(newGroups);
+  
+  // Show a summary of friend connections
+  let totalFriendConnections = 0;
+  let totalKeepApartViolations = 0;
+  
+  newGroups.forEach(group => {
+    for (let i = 0; i < group.children.length; i++) {
+      for (let j = i + 1; j < group.children.length; j++) {
+        if (areFriends(group.children[i], group.children[j])) {
+          totalFriendConnections++;
+        }
+        if (shouldKeepApart(group.children[i], group.children[j])) {
+          totalKeepApartViolations++;
+        }
+      }
+    }
+  });
+  
+  setTimeout(() => {
+    alert(`Groups generated! Friend connections: ${totalFriendConnections}, Keep-apart violations: ${totalKeepApartViolations}`);
+  }, 100);
+};
   const getTotalTargetSize = () => {
     return groupSizes.reduce((sum, size) => sum + size, 0);
   };
