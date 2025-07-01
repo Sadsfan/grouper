@@ -489,6 +489,7 @@ const moveChildBetweenGroups = (childId: number, sourceGroupId: number, targetGr
     }
     
     return newGroups;
+
   });
 };
   return (
