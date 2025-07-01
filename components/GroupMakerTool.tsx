@@ -228,7 +228,7 @@ export default function GroupMakerTool() {
   // Initialize empty groups
   for (let i = 0; i < numGroups; i++) {
     newGroups.push({
-  id: Math.random() * 1000000 + i,  // Use Math.random instead
+  id: i,  // Use Math.random instead
   children: groupChildren,
   targetSize: targetSize
 });newGroups.push({
