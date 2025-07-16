@@ -30,8 +30,6 @@ export default function GroupMakerTool() {
   const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
   const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
   const [showGenderModal, setShowGenderModal] = useState(false);
-  const [draggedChild, setDraggedChild] = useState<Child | null>(null);
-  const [draggedFromGroup, setDraggedFromGroup] = useState<number | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportFileInputRef = useRef<HTMLInputElement>(null);
@@ -175,7 +173,7 @@ export default function GroupMakerTool() {
         } else {
           alert('Invalid file format.');
         }
-      } catch (error) {
+      } catch {
         alert('Error reading file.');
       }
     };
@@ -964,7 +962,7 @@ export default function GroupMakerTool() {
           <p><strong>1. Add Children:</strong> Upload a CSV file or add children individually</p>
           <p><strong>2. Set Preferences:</strong> Add friends and keep-apart preferences for each child</p>
           <p><strong>3. Configure Groups:</strong> Set the number of groups and their sizes</p>
-          <p><strong>4. Generate:</strong> Click "Generate Groups" to create balanced groups</p>
+          <p><strong>4. Generate:</strong> Click &quot;Generate Groups&quot; to create balanced groups</p>
           <p><strong>5. Export:</strong> Save your groups as a CSV file</p>
         </div>
       </div>
