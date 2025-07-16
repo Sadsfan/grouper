@@ -30,7 +30,6 @@ export default function GroupMakerTool() {
   const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
   const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
   const [showGenderModal, setShowGenderModal] = useState(false);
-  const [editingChild, setEditingChild] = useState<number | null>(null);
   const [draggedChild, setDraggedChild] = useState<Child | null>(null);
   const [draggedFromGroup, setDraggedFromGroup] = useState<number | null>(null);
   
@@ -58,8 +57,8 @@ export default function GroupMakerTool() {
     
     if (savedChildren) {
       try {
-        const loadedChildren = JSON.parse(savedChildren);
-        const updatedChildren = loadedChildren.map((child: any) => ({
+        const loadedChildren = JSON.parse(savedChildren) as Child[];
+        const updatedChildren = loadedChildren.map((child: Child) => ({
           ...child,
           keepApart: child.keepApart || []
         }));
@@ -71,7 +70,15 @@ export default function GroupMakerTool() {
 
     if (savedSettings) {
       try {
-        const settings = JSON.parse(savedSettings);
+        const settings = JSON.parse(savedSettings) as {
+          friendPriorities?: {[key: string]: number};
+          mustBeTogether?: {[key: string]: string[]};
+          friendLimit?: number;
+          keepApartLimit?: number;
+          unlimitedFriends?: boolean;
+          unlimitedKeepApart?: boolean;
+          balanceByGender?: boolean;
+        };
         setFriendPriorities(settings.friendPriorities || {});
         setMustBeTogether(settings.mustBeTogether || {});
         setFriendLimit(settings.friendLimit || 3);
@@ -167,7 +174,18 @@ export default function GroupMakerTool() {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const jsonData = JSON.parse(e.target?.result as string);
+        const jsonData = JSON.parse(e.target?.result as string) as Child[] | {
+          children: Child[];
+          settings?: {
+            friendPriorities?: {[key: string]: number};
+            mustBeTogether?: {[key: string]: string[]};
+            friendLimit?: number;
+            keepApartLimit?: number;
+            unlimitedFriends?: boolean;
+            unlimitedKeepApart?: boolean;
+            balanceByGender?: boolean;
+          };
+        };
         
         // Handle both old format (just children array) and new format (children + settings)
         if (Array.isArray(jsonData)) {
@@ -184,7 +202,7 @@ export default function GroupMakerTool() {
           }
         } else if (jsonData.children && Array.isArray(jsonData.children)) {
           // New format with settings
-          const updatedData = jsonData.children.map((child: any) => ({
+          const updatedData = jsonData.children.map((child: Child) => ({
             ...child,
             keepApart: child.keepApart || []
           }));
@@ -379,7 +397,6 @@ export default function GroupMakerTool() {
     if (!friendName.trim()) return;
     
     const trimmedName = friendName.trim();
-    const targetChild = children.find(c => c.id === childId);
     const friendChild = children.find(c => c.name.toLowerCase() === trimmedName.toLowerCase());
     
     if (!friendChild) {
@@ -432,7 +449,6 @@ export default function GroupMakerTool() {
     if (!personName.trim()) return;
     
     const trimmedName = personName.trim();
-    const targetChild = children.find(c => c.id === childId);
     const otherChild = children.find(c => c.name.toLowerCase() === trimmedName.toLowerCase());
     
     if (!otherChild) {
