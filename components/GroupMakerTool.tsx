@@ -39,24 +39,26 @@ export default function GroupMakerTool() {
   // Load saved data on component mount
   useEffect(() => {
     try {
-      const savedChildren = localStorage.getItem('groupMakerChildren');
-      const savedSettings = localStorage.getItem('groupMakerSettings');
-      
-      if (savedChildren) {
-        const loadedChildren = JSON.parse(savedChildren);
-        setChildren(loadedChildren);
-      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const savedChildren = localStorage.getItem('groupMakerChildren');
+        const savedSettings = localStorage.getItem('groupMakerSettings');
+        
+        if (savedChildren) {
+          const loadedChildren = JSON.parse(savedChildren);
+          setChildren(loadedChildren);
+        }
 
-      if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        setFriendPriorities(settings.friendPriorities || {});
-        setMustBeTogether(settings.mustBeTogether || {});
-        setFriendLimit(settings.friendLimit || 3);
-        setKeepApartLimit(settings.keepApartLimit || 2);
-        setUnlimitedFriends(settings.unlimitedFriends || false);
-        setUnlimitedKeepApart(settings.unlimitedKeepApart || false);
-        setBalanceByGender(settings.balanceByGender !== false);
-        setGenderGrouping(settings.genderGrouping || 'mixed');
+        if (savedSettings) {
+          const settings = JSON.parse(savedSettings);
+          setFriendPriorities(settings.friendPriorities || {});
+          setMustBeTogether(settings.mustBeTogether || {});
+          setFriendLimit(settings.friendLimit || 3);
+          setKeepApartLimit(settings.keepApartLimit || 2);
+          setUnlimitedFriends(settings.unlimitedFriends || false);
+          setUnlimitedKeepApart(settings.unlimitedKeepApart || false);
+          setBalanceByGender(settings.balanceByGender !== false);
+          setGenderGrouping(settings.genderGrouping || 'mixed');
+        }
       }
     } catch (error) {
       console.error('Error loading saved data:', error);
@@ -66,23 +68,25 @@ export default function GroupMakerTool() {
 
   // Save data
   useEffect(() => {
-    if (children.length > 0) {
+    if (typeof window !== 'undefined' && window.localStorage && children.length > 0) {
       localStorage.setItem('groupMakerChildren', JSON.stringify(children));
     }
   }, [children]);
 
   useEffect(() => {
-    const settings = {
-      friendPriorities,
-      mustBeTogether,
-      friendLimit,
-      keepApartLimit,
-      unlimitedFriends,
-      unlimitedKeepApart,
-      balanceByGender,
-      genderGrouping
-    };
-    localStorage.setItem('groupMakerSettings', JSON.stringify(settings));
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const settings = {
+        friendPriorities,
+        mustBeTogether,
+        friendLimit,
+        keepApartLimit,
+        unlimitedFriends,
+        unlimitedKeepApart,
+        balanceByGender,
+        genderGrouping
+      };
+      localStorage.setItem('groupMakerSettings', JSON.stringify(settings));
+    }
   }, [friendPriorities, mustBeTogether, friendLimit, keepApartLimit, unlimitedFriends, unlimitedKeepApart, balanceByGender, genderGrouping]);
 
   if (!mounted) {
@@ -105,8 +109,10 @@ export default function GroupMakerTool() {
       setGroups([]);
       setFriendPriorities({});
       setMustBeTogether({});
-      localStorage.removeItem('groupMakerChildren');
-      localStorage.removeItem('groupMakerSettings');
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('groupMakerChildren');
+        localStorage.removeItem('groupMakerSettings');
+      }
     }
   };
 
