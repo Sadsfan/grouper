@@ -44,10 +44,6 @@ export default function GroupMakerTool() {
   const [balanceByGender, setBalanceByGender] = useState(true);
   const [genderGrouping, setGenderGrouping] = useState<'mixed' | 'boys-only' | 'girls-only'>('mixed');
 
-  // Friend priority system
-  const [friendPriorities, setFriendPriorities] = useState<{[key: string]: number}>({});
-  const [mustBeTogether, setMustBeTogether] = useState<{[key: string]: string[]}>({});
-
   // Child editing
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -71,8 +67,6 @@ export default function GroupMakerTool() {
 
         if (savedSettings) {
           const settings = JSON.parse(savedSettings);
-          setFriendPriorities(settings.friendPriorities || {});
-          setMustBeTogether(settings.mustBeTogether || {});
           setFriendLimit(settings.friendLimit || 3);
           setKeepApartLimit(settings.keepApartLimit || 2);
           setUnlimitedFriends(settings.unlimitedFriends || false);
@@ -97,8 +91,6 @@ export default function GroupMakerTool() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       const settings = {
-        friendPriorities,
-        mustBeTogether,
         friendLimit,
         keepApartLimit,
         unlimitedFriends,
@@ -108,7 +100,7 @@ export default function GroupMakerTool() {
       };
       localStorage.setItem('groupMakerSettings', JSON.stringify(settings));
     }
-  }, [friendPriorities, mustBeTogether, friendLimit, keepApartLimit, unlimitedFriends, unlimitedKeepApart, balanceByGender, genderGrouping]);
+  }, [friendLimit, keepApartLimit, unlimitedFriends, unlimitedKeepApart, balanceByGender, genderGrouping]);
 
   if (!mounted) {
     return (
@@ -128,8 +120,6 @@ export default function GroupMakerTool() {
     if (window.confirm('Are you sure you want to clear all children? This cannot be undone.')) {
       setChildren([]);
       setGroups([]);
-      setFriendPriorities({});
-      setMustBeTogether({});
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.removeItem('groupMakerChildren');
         localStorage.removeItem('groupMakerSettings');
@@ -141,8 +131,6 @@ export default function GroupMakerTool() {
     const dataStr = JSON.stringify({
       children,
       settings: {
-        friendPriorities,
-        mustBeTogether,
         friendLimit,
         keepApartLimit,
         unlimitedFriends,
@@ -176,8 +164,6 @@ export default function GroupMakerTool() {
           setChildren(jsonData.children);
           if (jsonData.settings) {
             const settings = jsonData.settings;
-            setFriendPriorities(settings.friendPriorities || {});
-            setMustBeTogether(settings.mustBeTogether || {});
             setFriendLimit(settings.friendLimit || 3);
             setKeepApartLimit(settings.keepApartLimit || 2);
             setUnlimitedFriends(settings.unlimitedFriends || false);
@@ -296,43 +282,7 @@ export default function GroupMakerTool() {
     ));
   };
 
-  const setFriendPriority = (childId: number, friendName: string, priority: number) => {
-    const key = `${childId}-${friendName}`;
-    setFriendPriorities(prev => ({
-      ...prev,
-      [key]: priority
-    }));
-  };
 
-  const toggleMustBeTogether = (childId: number, friendName: string, mustBe: boolean) => {
-    setMustBeTogether(prev => {
-      const childKey = childId.toString();
-      const currentMustBe = prev[childKey] || [];
-      
-      if (mustBe && !currentMustBe.includes(friendName)) {
-        return {
-          ...prev,
-          [childKey]: [...currentMustBe, friendName]
-        };
-      } else if (!mustBe) {
-        return {
-          ...prev,
-          [childKey]: currentMustBe.filter(name => name !== friendName)
-        };
-      }
-      return prev;
-    });
-  };
-
-  const getFriendPriority = (childId: number, friendName: string): number => {
-    const key = `${childId}-${friendName}`;
-    return friendPriorities[key] || 1;
-  };
-
-  const isMustBeTogether = (childId: number, friendName: string): boolean => {
-    const childKey = childId.toString();
-    return mustBeTogether[childKey]?.includes(friendName) || false;
-  };
 
   const updateNumGroups = (newNumGroups: number) => {
     setNumGroups(newNumGroups);
