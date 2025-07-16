@@ -1,19 +1,25 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 
-interface Child {
+type Child = {
   id: number;
   name: string;
   gender: string;
   friends: string[];
   keepApart: string[];
-}
+};
 
-interface Group {
+type Group = {
   id: number;
   children: Child[];
   targetSize: number;
-}
+};
+
+type PendingChild = {
+  id: number;
+  name: string;
+  gender: string;
+};
 
 export default function GroupMakerTool() {
   const [name, setName] = useState('');
@@ -22,6 +28,10 @@ export default function GroupMakerTool() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [numGroups, setNumGroups] = useState(3);
   const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
+  const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [draggedChild, setDraggedChild] = useState<Child | null>(null);
+  const [draggedFromGroup, setDraggedFromGroup] = useState<number | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportFileInputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +44,10 @@ export default function GroupMakerTool() {
   const [balanceByGender, setBalanceByGender] = useState(true);
   const [genderGrouping, setGenderGrouping] = useState<'mixed' | 'boys-only' | 'girls-only'>('mixed');
 
+  // Friend priority system
+  const [friendPriorities, setFriendPriorities] = useState<{[key: string]: number}>({});
+  const [mustBeTogether, setMustBeTogether] = useState<{[key: string]: string[]}>({});
+
   // Child editing
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -45,52 +59,56 @@ export default function GroupMakerTool() {
 
   // Load saved data on component mount
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const savedChildren = localStorage.getItem('groupMakerChildren');
-        const savedSettings = localStorage.getItem('groupMakerSettings');
-        
-        if (savedChildren) {
-          const loadedChildren = JSON.parse(savedChildren) as Child[];
-          setChildren(loadedChildren);
-        }
-
-        if (savedSettings) {
-          const settings = JSON.parse(savedSettings);
-          setFriendLimit(settings.friendLimit || 3);
-          setKeepApartLimit(settings.keepApartLimit || 2);
-          setUnlimitedFriends(settings.unlimitedFriends || false);
-          setUnlimitedKeepApart(settings.unlimitedKeepApart || false);
-          setBalanceByGender(settings.balanceByGender !== false);
-          setGenderGrouping(settings.genderGrouping || 'mixed');
-        }
+    const savedChildren = localStorage.getItem('groupMakerChildren');
+    const savedSettings = localStorage.getItem('groupMakerSettings');
+    
+    if (savedChildren) {
+      try {
+        const loadedChildren = JSON.parse(savedChildren) as Child[];
+        setChildren(loadedChildren);
+      } catch {
+        console.error('Error loading saved children');
       }
-    } catch (error) {
-      console.error('Error loading saved data:', error);
+    }
+
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        setFriendPriorities(settings.friendPriorities || {});
+        setMustBeTogether(settings.mustBeTogether || {});
+        setFriendLimit(settings.friendLimit || 3);
+        setKeepApartLimit(settings.keepApartLimit || 2);
+        setUnlimitedFriends(settings.unlimitedFriends || false);
+        setUnlimitedKeepApart(settings.unlimitedKeepApart || false);
+        setBalanceByGender(settings.balanceByGender !== false);
+        setGenderGrouping(settings.genderGrouping || 'mixed');
+      } catch {
+        console.error('Error loading saved settings');
+      }
     }
     setMounted(true);
   }, []);
 
   // Save data
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage && children.length > 0) {
+    if (children.length > 0) {
       localStorage.setItem('groupMakerChildren', JSON.stringify(children));
     }
   }, [children]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const settings = {
-        friendLimit,
-        keepApartLimit,
-        unlimitedFriends,
-        unlimitedKeepApart,
-        balanceByGender,
-        genderGrouping
-      };
-      localStorage.setItem('groupMakerSettings', JSON.stringify(settings));
-    }
-  }, [friendLimit, keepApartLimit, unlimitedFriends, unlimitedKeepApart, balanceByGender, genderGrouping]);
+    const settings = {
+      friendPriorities,
+      mustBeTogether,
+      friendLimit,
+      keepApartLimit,
+      unlimitedFriends,
+      unlimitedKeepApart,
+      balanceByGender,
+      genderGrouping
+    };
+    localStorage.setItem('groupMakerSettings', JSON.stringify(settings));
+  }, [friendPriorities, mustBeTogether, friendLimit, keepApartLimit, unlimitedFriends, unlimitedKeepApart, balanceByGender, genderGrouping]);
 
   if (!mounted) {
     return (
@@ -107,13 +125,13 @@ export default function GroupMakerTool() {
   }
 
   const clearAllData = () => {
-    if (window.confirm('Are you sure you want to clear all children? This cannot be undone.')) {
+    if (confirm('Are you sure you want to clear all children? This cannot be undone.')) {
       setChildren([]);
       setGroups([]);
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.removeItem('groupMakerChildren');
-        localStorage.removeItem('groupMakerSettings');
-      }
+      setFriendPriorities({});
+      setMustBeTogether({});
+      localStorage.removeItem('groupMakerChildren');
+      localStorage.removeItem('groupMakerSettings');
     }
   };
 
@@ -121,6 +139,8 @@ export default function GroupMakerTool() {
     const dataStr = JSON.stringify({
       children,
       settings: {
+        friendPriorities,
+        mustBeTogether,
         friendLimit,
         keepApartLimit,
         unlimitedFriends,
@@ -154,6 +174,8 @@ export default function GroupMakerTool() {
           setChildren(jsonData.children);
           if (jsonData.settings) {
             const settings = jsonData.settings;
+            setFriendPriorities(settings.friendPriorities || {});
+            setMustBeTogether(settings.mustBeTogether || {});
             setFriendLimit(settings.friendLimit || 3);
             setKeepApartLimit(settings.keepApartLimit || 2);
             setUnlimitedFriends(settings.unlimitedFriends || false);
@@ -201,7 +223,7 @@ export default function GroupMakerTool() {
       return;
     }
 
-    const newChild: Child = {
+    const newChild = {
       id: Date.now(),
       name: name.trim(),
       gender: gender,
@@ -213,7 +235,7 @@ export default function GroupMakerTool() {
   };
 
   const removeChild = (id: number) => {
-    if (window.confirm('Are you sure you want to remove this child?')) {
+    if (confirm('Are you sure you want to remove this child?')) {
       const childToRemove = children.find(c => c.id === id);
       if (childToRemove) {
         setChildren(prev => prev
@@ -272,7 +294,43 @@ export default function GroupMakerTool() {
     ));
   };
 
+  const setFriendPriority = (childId: number, friendName: string, priority: number) => {
+    const key = `${childId}-${friendName}`;
+    setFriendPriorities(prev => ({
+      ...prev,
+      [key]: priority
+    }));
+  };
 
+  const toggleMustBeTogether = (childId: number, friendName: string, mustBe: boolean) => {
+    setMustBeTogether(prev => {
+      const childKey = childId.toString();
+      const currentMustBe = prev[childKey] || [];
+      
+      if (mustBe && !currentMustBe.includes(friendName)) {
+        return {
+          ...prev,
+          [childKey]: [...currentMustBe, friendName]
+        };
+      } else if (!mustBe) {
+        return {
+          ...prev,
+          [childKey]: currentMustBe.filter(name => name !== friendName)
+        };
+      }
+      return prev;
+    });
+  };
+
+  const getFriendPriority = (childId: number, friendName: string): number => {
+    const key = `${childId}-${friendName}`;
+    return friendPriorities[key] || 1;
+  };
+
+  const isMustBeTogether = (childId: number, friendName: string): boolean => {
+    const childKey = childId.toString();
+    return mustBeTogether[childKey]?.includes(friendName) || false;
+  };
 
   const updateNumGroups = (newNumGroups: number) => {
     setNumGroups(newNumGroups);
@@ -732,8 +790,8 @@ export default function GroupMakerTool() {
           <div className="flex items-end">
             <button 
               onClick={addChild}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               disabled={!name.trim()}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
             >
               Add Child
             </button>
@@ -742,164 +800,213 @@ export default function GroupMakerTool() {
       </div>
 
       {/* Group Configuration */}
-      <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-        <h2 className="text-xl font-semibold mb-4">🎯 Group Configuration</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-          <div>
-            <label className="block text-sm font-medium mb-2">Number of Groups: {numGroups}</label>
-            <input
-              type="range"
-              min="2"
-              max="10"
-              value={numGroups}
-              onChange={(e) => updateNumGroups(parseInt(e.target.value))}
-              className="w-full"
-            />
+      {children.length > 0 && (
+        <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+          <h2 className="text-xl font-semibold mb-4">🎯 Configure Groups</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">Number of Groups: {numGroups}</label>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={numGroups}
+                onChange={(e) => updateNumGroups(parseInt(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            
+            <div>
+              <p className="text-sm text-gray-600">
+                <strong>Total children:</strong> {children.length}<br/>
+                <strong>Total group capacity:</strong> {getTotalTargetSize()}
+              </p>
+            </div>
           </div>
-          <div className="text-center">
-            <p className="text-sm text-gray-600 mb-2">Total Target Size: {getTotalTargetSize()}</p>
-            <p className="text-sm text-gray-600">Children Added: {children.length}</p>
+
+          <div className="mt-4">
+            <h3 className="font-medium mb-3">Group Sizes:</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {Array.from({ length: numGroups }, (_, i) => (
+                <div key={i}>
+                  <label className="block text-sm font-medium mb-1">Group {i + 1}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={groupSizes[i] || 4}
+                    onChange={(e) => updateGroupSize(i, parseInt(e.target.value) || 4)}
+                    className="w-full p-2 border rounded text-center"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={generateGroups}
+              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
+              disabled={children.length === 0}
+            >
+              🎲 Generate Groups
+            </button>
           </div>
         </div>
-        
-        <div className="mt-4">
-          <label className="block text-sm font-medium mb-2">Group Sizes</label>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            {Array.from({ length: numGroups }, (_, i) => (
-              <div key={i} className="flex flex-col">
-                <label className="text-xs text-gray-600 mb-1">Group {i + 1}</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={groupSizes[i] || 4}
-                  onChange={(e) => updateGroupSize(i, parseInt(e.target.value) || 4)}
-                  className="p-2 border rounded text-center"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <div className="mt-4 flex justify-center">
-          <button
-            onClick={generateGroups}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
-            disabled={children.length === 0}
-          >
-            🎲 Generate Groups
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Children List */}
       {children.length > 0 && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <h2 className="text-xl font-semibold mb-4">👶 Children ({children.length})</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">👶 Children List ({children.length})</h2>
+            <div className="text-sm text-gray-600">
+              Boys: {children.filter(c => c.gender === 'boy').length} | 
+              Girls: {children.filter(c => c.gender === 'girl').length}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
             {children.map((child) => (
-              <div key={child.id} className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-lg">{child.name}</h3>
-                  <div className="flex gap-1">
+              <div key={child.id} className="p-4 bg-white rounded-lg border shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-lg">
+                    {child.name} {child.gender === 'boy' ? '👦' : '👧'}
+                  </h3>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => startEditChild(child)}
-                      className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                      className="text-blue-500 hover:text-blue-700 text-sm"
+                      title="Edit child"
                     >
                       ✏️
                     </button>
                     <button
                       onClick={() => removeChild(child.id)}
-                      className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                      className="text-red-500 hover:text-red-700 text-sm"
+                      title="Remove child"
                     >
-                      🗑️
+                      ❌
                     </button>
                   </div>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">
-                  {child.gender === 'boy' ? '👦' : '👧'} {child.gender}
-                </p>
-                
-                {/* Friends */}
+
+                {/* Friends Section */}
                 <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Friends ({child.friends.length}/{unlimitedFriends ? '∞' : friendLimit})
-                  </label>
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {child.friends.map((friend, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs flex items-center gap-1"
-                      >
-                        {friend}
-                        <button
-                          onClick={() => removeFriend(child.id, friend)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  {(unlimitedFriends || child.friends.length < friendLimit) && (
-                    <select
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addFriend(child.id, e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      className="w-full p-1 border rounded text-xs"
-                    >
-                      <option value="">Add friend...</option>
-                      {children
-                        .filter(c => c.id !== child.id && !child.friends.includes(c.name))
-                        .map(c => (
-                          <option key={c.id} value={c.name}>{c.name}</option>
-                        ))}
-                    </select>
+                  <h4 className="font-medium text-sm mb-2 text-green-600">👥 Friends:</h4>
+                  {child.friends.length > 0 ? (
+                    <div className="space-y-1">
+                      {child.friends.map((friendName, index) => {
+                        const priority = getFriendPriority(child.id, friendName);
+                        const mustBe = isMustBeTogether(child.id, friendName);
+                        return (
+                          <div key={index} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
+                            <div className="flex items-center gap-2">
+                              <span>{friendName}</span>
+                              <div className="flex gap-1">
+                                {[1, 2, 3].map(p => (
+                                  <button
+                                    key={p}
+                                    onClick={() => setFriendPriority(child.id, friendName, p)}
+                                    className={`w-4 h-4 rounded text-xs ${
+                                      priority >= p ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                                    }`}
+                                    title={`Priority ${p}`}
+                                  >
+                                    ⭐
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={() => toggleMustBeTogether(child.id, friendName, !mustBe)}
+                                  className={`w-4 h-4 rounded text-xs ${
+                                    mustBe ? 'bg-red-500 text-white' : 'bg-gray-200'
+                                  }`}
+                                  title="Must be together"
+                                >
+                                  🔒
+                                </button>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeFriend(child.id, friendName)}
+                              className="text-red-500 hover:text-red-700"
+                              title="Remove friend"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">No friends added</p>
                   )}
+                  
+                  {(!unlimitedFriends && child.friends.length < friendLimit) || unlimitedFriends ? (
+                    <div className="mt-2 flex gap-1">
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            addFriend(child.id, e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="text-xs p-1 border rounded flex-1"
+                      >
+                        <option value="">Add friend...</option>
+                        {children
+                          .filter(c => c.id !== child.id && !child.friends.includes(c.name))
+                          .map(c => (
+                            <option key={c.id} value={c.name}>{c.name}</option>
+                          ))}
+                      </select>
+                    </div>
+                  ) : null}
                 </div>
-                
-                {/* Keep Apart */}
+
+                {/* Keep Apart Section */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Keep Apart ({child.keepApart.length}/{unlimitedKeepApart ? '∞' : keepApartLimit})
-                  </label>
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {child.keepApart.map((person, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs flex items-center gap-1"
-                      >
-                        {person}
-                        <button
-                          onClick={() => removeKeepApart(child.id, person)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  {(unlimitedKeepApart || child.keepApart.length < keepApartLimit) && (
-                    <select
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addKeepApart(child.id, e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      className="w-full p-1 border rounded text-xs"
-                    >
-                      <option value="">Add keep apart...</option>
-                      {children
-                        .filter(c => c.id !== child.id && !child.keepApart.includes(c.name))
-                        .map(c => (
-                          <option key={c.id} value={c.name}>{c.name}</option>
-                        ))}
-                    </select>
+                  <h4 className="font-medium text-sm mb-2 text-red-600">⚠️ Keep Apart:</h4>
+                  {child.keepApart.length > 0 ? (
+                    <div className="space-y-1">
+                      {child.keepApart.map((personName, index) => (
+                        <div key={index} className="flex items-center justify-between text-xs p-2 bg-red-50 rounded">
+                          <span>{personName}</span>
+                          <button
+                            onClick={() => removeKeepApart(child.id, personName)}
+                            className="text-red-500 hover:text-red-700"
+                            title="Remove keep apart"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">No keep-apart rules</p>
                   )}
+                  
+                  {(!unlimitedKeepApart && child.keepApart.length < keepApartLimit) || unlimitedKeepApart ? (
+                    <div className="mt-2 flex gap-1">
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            addKeepApart(child.id, e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="text-xs p-1 border rounded flex-1"
+                      >
+                        <option value="">Add keep apart...</option>
+                        {children
+                          .filter(c => c.id !== child.id && !child.keepApart.includes(c.name))
+                          .map(c => (
+                            <option key={c.id} value={c.name}>{c.name}</option>
+                          ))}
+                      </select>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -907,57 +1014,129 @@ export default function GroupMakerTool() {
         </div>
       )}
 
-      {/* Generated Groups */}
+      {/* Generated Groups Display */}
       {groups.length > 0 && (
         <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">🎉 Generated Groups</h2>
-            <button
-              onClick={exportGroupsAsCSV}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              📄 Export CSV
-            </button>
+            <h2 className="text-xl font-semibold text-green-700">🎯 Generated Groups</h2>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={exportGroupsAsCSV}
+                className="px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+              >
+                📊 Export CSV
+              </button>
+            </div>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {groups.map((group, index) => (
-              <div key={group.id} className="bg-white p-4 rounded-lg border border-gray-200">
-                <h3 className="font-semibold text-lg mb-3 text-center">
-                  Group {index + 1} ({group.children.length}/{group.targetSize})
-                </h3>
-                <div className="space-y-2">
-                  {group.children.map((child) => (
-                    <div
-                      key={child.id}
-                      className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                    >
-                      <span className="font-medium">{child.name}</span>
-                      <span className="text-sm text-gray-600">
-                        {child.gender === 'boy' ? '👦' : '👧'}
-                      </span>
+            {groups.map((group, groupIndex) => {
+              const boys = group.children.filter(c => c.gender === 'boy').length;
+              const girls = group.children.filter(c => c.gender === 'girl').length;
+              
+              return (
+                <div key={group.id} className="bg-white p-4 rounded-lg border shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-lg">Group {groupIndex + 1}</h3>
+                    <div className="text-sm text-gray-600">
+                      {group.children.length}/{group.targetSize} ({boys}B/{girls}G)
                     </div>
-                  ))}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {group.children.map((child, childIndex) => (
+                      <div key={child.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {childIndex + 1}. {child.name}
+                          </span>
+                          <span className="text-xs">
+                            {child.gender === 'boy' ? '👦' : '👧'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {group.children.length === 0 && (
+                      <p className="text-gray-500 text-sm italic text-center py-4">Empty group</p>
+                    )}
+                  </div>
+                  
+                  {group.children.length < group.targetSize && (
+                    <div className="mt-2 text-xs text-gray-500 text-center">
+                      {group.targetSize - group.children.length} spots remaining
+                    </div>
+                  )}
                 </div>
-                {group.children.length === 0 && (
-                  <p className="text-gray-500 text-center italic">No children assigned</p>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Help Section */}
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h2 className="text-lg font-semibold mb-3">❓ How to Use</h2>
-        <div className="text-sm text-gray-700 space-y-2">
-          <p><strong>1. Add Children:</strong> Upload a CSV file or add children individually</p>
-          <p><strong>2. Set Preferences:</strong> Add friends and keep-apart preferences for each child</p>
-          <p><strong>3. Configure Groups:</strong> Set the number of groups and their sizes</p>
-          <p><strong>4. Generate:</strong> Click &quot;Generate Groups&quot; to create balanced groups</p>
-          <p><strong>5. Export:</strong> Save your groups as a CSV file</p>
+      {/* Summary Statistics */}
+      {children.length > 0 && (
+        <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+          <h2 className="text-xl font-semibold mb-4 text-indigo-700">📊 Summary</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-indigo-600">{children.length}</div>
+              <div className="text-gray-600">Total Children</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {children.reduce((sum, child) => sum + child.friends.length, 0)}
+              </div>
+              <div className="text-gray-600">Friendships</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">
+                {children.reduce((sum, child) => sum + child.keepApart.length, 0)}
+              </div>
+              <div className="text-gray-600">Keep-Apart Rules</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {Object.values(mustBeTogether).reduce((sum, arr) => sum + arr.length, 0)}
+              </div>
+              <div className="text-gray-600">Must-Be-Together</div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Getting Started Help */}
+      {children.length === 0 && (
+        <div className="mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">🚀 Getting Started</h2>
+          <div className="space-y-4 text-gray-600">
+            <div className="flex items-start gap-3">
+              <span className="text-blue-600 font-bold">1.</span>
+              <div>
+                <strong>Add children</strong> either individually using the form above, or upload a CSV file with names and optional genders.
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-blue-600 font-bold">2.</span>
+              <div>
+                <strong>Set up relationships</strong> by adding friends and keep-apart rules for each child. Use priority levels (⭐⭐⭐) and must-be-together (🔒) for important relationships.
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-blue-600 font-bold">3.</span>
+              <div>
+                <strong>Configure groups</strong> by setting the number of groups and their sizes based on your needs.
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-blue-600 font-bold">4.</span>
+              <div>
+                <strong>Generate groups</strong> using the smart algorithm, then export results.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
