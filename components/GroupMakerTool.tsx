@@ -15,12 +15,6 @@ type Group = {
   targetSize: number;
 };
 
-type PendingChild = {
-  id: number;
-  name: string;
-  gender: string;
-};
-
 export default function GroupMakerTool() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState('boy');
