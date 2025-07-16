@@ -1,19 +1,40 @@
+'use client';
 import { useState, useRef, useEffect } from 'react';
+
+interface Child {
+  id: number;
+  name: string;
+  gender: string;
+  friends: string[];
+  keepApart: string[];
+}
+
+interface Group {
+  id: number;
+  children: Child[];
+  targetSize: number;
+}
+
+interface PendingChild {
+  id: number;
+  name: string;
+  gender: string;
+}
 
 export default function GroupMakerTool() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState('boy');
-  const [children, setChildren] = useState([]);
-  const [groups, setGroups] = useState([]);
+  const [children, setChildren] = useState<Child[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [numGroups, setNumGroups] = useState(3);
-  const [groupSizes, setGroupSizes] = useState([4, 4, 4]);
-  const [pendingChildren, setPendingChildren] = useState([]);
+  const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
+  const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
   const [showGenderModal, setShowGenderModal] = useState(false);
-  const [draggedChild, setDraggedChild] = useState(null);
-  const [draggedFromGroup, setDraggedFromGroup] = useState(null);
+  const [draggedChild, setDraggedChild] = useState<Child | null>(null);
+  const [draggedFromGroup, setDraggedFromGroup] = useState<number | null>(null);
   
-  const fileInputRef = useRef(null);
-  const exportFileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const exportFileInputRef = useRef<HTMLInputElement>(null);
 
   // Settings
   const [friendLimit, setFriendLimit] = useState(3);
@@ -21,17 +42,17 @@ export default function GroupMakerTool() {
   const [unlimitedFriends, setUnlimitedFriends] = useState(false);
   const [unlimitedKeepApart, setUnlimitedKeepApart] = useState(false);
   const [balanceByGender, setBalanceByGender] = useState(true);
-  const [genderGrouping, setGenderGrouping] = useState('mixed');
+  const [genderGrouping, setGenderGrouping] = useState<'mixed' | 'boys-only' | 'girls-only'>('mixed');
 
   // Friend priority system
-  const [friendPriorities, setFriendPriorities] = useState({});
-  const [mustBeTogether, setMustBeTogether] = useState({});
+  const [friendPriorities, setFriendPriorities] = useState<{[key: string]: number}>({});
+  const [mustBeTogether, setMustBeTogether] = useState<{[key: string]: string[]}>({});
 
   // Child editing
-  const [editingChild, setEditingChild] = useState(null);
+  const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreImportModal, setShowPreImportModal] = useState(false);
-  const [preImportChildren, setPreImportChildren] = useState([]);
+  const [preImportChildren, setPreImportChildren] = useState<Child[]>([]);
 
   // Client-side mounting check
   const [mounted, setMounted] = useState(false);
@@ -44,7 +65,7 @@ export default function GroupMakerTool() {
         const savedSettings = localStorage.getItem('groupMakerSettings');
         
         if (savedChildren) {
-          const loadedChildren = JSON.parse(savedChildren);
+          const loadedChildren = JSON.parse(savedChildren) as Child[];
           setChildren(loadedChildren);
         }
 
@@ -139,14 +160,14 @@ export default function GroupMakerTool() {
     URL.revokeObjectURL(url);
   };
 
-  const uploadChildrenData = (event) => {
+  const uploadChildrenData = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const jsonData = JSON.parse(e.target?.result);
+        const jsonData = JSON.parse(e.target?.result as string);
         
         if (Array.isArray(jsonData)) {
           setChildren(jsonData);
@@ -176,7 +197,7 @@ export default function GroupMakerTool() {
     if (event.target) event.target.value = '';
   };
 
-  const detectGender = (name) => {
+  const detectGender = (name: string) => {
     const maleNames = ['noah', 'kieran', 'edward', 'owen', 'drew', 'beau', 'eoin', 'euan', 'lorenzo', 'rory', 'cian', 'patryk', 'james', 'john', 'michael', 'william', 'david'];
     const femaleNames = ['charlotte', 'ellie', 'connie', 'elisa', 'sadie', 'christy', 'aoife', 'beatrix', 'dolly', 'lilly', 'orlaith', 'caoimhe', 'evelyn', 'darcie', 'esme', 'mary', 'patricia'];
     
@@ -187,7 +208,7 @@ export default function GroupMakerTool() {
     return null;
   };
 
-  const validateChildName = (name) => {
+  const validateChildName = (name: string): string | null => {
     const trimmedName = name.trim();
     if (trimmedName.length === 0) return 'Name cannot be empty';
     if (trimmedName.length > 50) return 'Name is too long';
@@ -204,7 +225,7 @@ export default function GroupMakerTool() {
       return;
     }
 
-    const newChild = {
+    const newChild: Child = {
       id: Date.now(),
       name: name.trim(),
       gender: gender,
@@ -215,7 +236,7 @@ export default function GroupMakerTool() {
     setName('');
   };
 
-  const removeChild = (id) => {
+  const removeChild = (id: number) => {
     if (window.confirm('Are you sure you want to remove this child?')) {
       const childToRemove = children.find(c => c.id === id);
       if (childToRemove) {
@@ -231,7 +252,7 @@ export default function GroupMakerTool() {
     }
   };
 
-  const addFriend = (childId, friendName) => {
+  const addFriend = (childId: number, friendName: string) => {
     if (!friendName.trim()) return;
     
     setChildren(children.map(child => {
@@ -245,7 +266,7 @@ export default function GroupMakerTool() {
     }));
   };
 
-  const removeFriend = (childId, friendName) => {
+  const removeFriend = (childId: number, friendName: string) => {
     setChildren(children.map(child => 
       child.id === childId 
         ? { ...child, friends: child.friends.filter(f => f !== friendName) }
@@ -253,7 +274,7 @@ export default function GroupMakerTool() {
     ));
   };
 
-  const addKeepApart = (childId, personName) => {
+  const addKeepApart = (childId: number, personName: string) => {
     if (!personName.trim()) return;
     
     setChildren(children.map(child => {
@@ -267,7 +288,7 @@ export default function GroupMakerTool() {
     }));
   };
 
-  const removeKeepApart = (childId, personName) => {
+  const removeKeepApart = (childId: number, personName: string) => {
     setChildren(children.map(child => 
       child.id === childId 
         ? { ...child, keepApart: child.keepApart.filter(p => p !== personName) }
@@ -275,7 +296,7 @@ export default function GroupMakerTool() {
     ));
   };
 
-  const setFriendPriority = (childId, friendName, priority) => {
+  const setFriendPriority = (childId: number, friendName: string, priority: number) => {
     const key = `${childId}-${friendName}`;
     setFriendPriorities(prev => ({
       ...prev,
@@ -283,7 +304,7 @@ export default function GroupMakerTool() {
     }));
   };
 
-  const toggleMustBeTogether = (childId, friendName, mustBe) => {
+  const toggleMustBeTogether = (childId: number, friendName: string, mustBe: boolean) => {
     setMustBeTogether(prev => {
       const childKey = childId.toString();
       const currentMustBe = prev[childKey] || [];
@@ -303,17 +324,17 @@ export default function GroupMakerTool() {
     });
   };
 
-  const getFriendPriority = (childId, friendName) => {
+  const getFriendPriority = (childId: number, friendName: string): number => {
     const key = `${childId}-${friendName}`;
     return friendPriorities[key] || 1;
   };
 
-  const isMustBeTogether = (childId, friendName) => {
+  const isMustBeTogether = (childId: number, friendName: string): boolean => {
     const childKey = childId.toString();
     return mustBeTogether[childKey]?.includes(friendName) || false;
   };
 
-  const updateNumGroups = (newNumGroups) => {
+  const updateNumGroups = (newNumGroups: number) => {
     setNumGroups(newNumGroups);
     const newSizes = Array(newNumGroups).fill(4);
     for (let i = 0; i < Math.min(newNumGroups, groupSizes.length); i++) {
@@ -322,13 +343,13 @@ export default function GroupMakerTool() {
     setGroupSizes(newSizes);
   };
 
-  const updateGroupSize = (groupIndex, size) => {
+  const updateGroupSize = (groupIndex: number, size: number) => {
     const newSizes = [...groupSizes];
     newSizes[groupIndex] = size;
     setGroupSizes(newSizes);
   };
 
-  const updateChild = (updatedChild) => {
+  const updateChild = (updatedChild: Child) => {
     setChildren(children.map(child => 
       child.id === updatedChild.id ? updatedChild : child
     ));
@@ -336,7 +357,7 @@ export default function GroupMakerTool() {
     setShowEditModal(false);
   };
 
-  const startEditChild = (child) => {
+  const startEditChild = (child: Child) => {
     setEditingChild({ ...child });
     setShowEditModal(true);
   };
@@ -347,7 +368,7 @@ export default function GroupMakerTool() {
       return;
     }
 
-    const newGroups = [];
+    const newGroups: Group[] = [];
     
     // Initialize empty groups
     for (let i = 0; i < numGroups; i++) {
@@ -363,7 +384,7 @@ export default function GroupMakerTool() {
     // Simple distribution for now
     let currentGroup = 0;
     while (remainingChildren.length > 0) {
-      const child = remainingChildren.shift();
+      const child = remainingChildren.shift()!;
       
       if (newGroups[currentGroup].children.length < newGroups[currentGroup].targetSize) {
         newGroups[currentGroup].children.push(child);
@@ -381,15 +402,15 @@ export default function GroupMakerTool() {
     return groupSizes.reduce((sum, size) => sum + size, 0);
   };
 
-  const handleCSVUpload = (event) => {
+  const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const csvContent = e.target?.result;
+      const csvContent = e.target?.result as string;
       const lines = csvContent.split('\n');
-      const parsedChildren = [];
+      const parsedChildren: Child[] = [];
 
       lines.forEach((line, index) => {
         if (line.trim() && index > 0) {
@@ -408,7 +429,7 @@ export default function GroupMakerTool() {
             parsedChildren.push({
               id: Date.now() + index + Math.random(),
               name: name,
-              gender: childGender || 'boy',
+              gender: (childGender as 'boy' | 'girl') || 'boy',
               friends: [],
               keepApart: []
             });
@@ -435,7 +456,7 @@ export default function GroupMakerTool() {
     alert(`Added ${preImportChildren.length} children successfully!`);
   };
 
-  const updatePreImportChildGender = (childId, newGender) => {
+  const updatePreImportChildGender = (childId: number, newGender: 'boy' | 'girl') => {
     setPreImportChildren(prev => prev.map(child => 
       child.id === childId ? { ...child, gender: newGender } : child
     ));
@@ -695,7 +716,7 @@ export default function GroupMakerTool() {
                 <label className="block text-sm font-medium mb-2">Group Type</label>
                 <select
                   value={genderGrouping}
-                  onChange={(e) => setGenderGrouping(e.target.value)}
+                  onChange={(e) => setGenderGrouping(e.target.value as 'mixed' | 'boys-only' | 'girls-only')}
                   className="w-full p-2 border rounded-lg"
                 >
                   <option value="mixed">Mixed groups (boys & girls)</option>
