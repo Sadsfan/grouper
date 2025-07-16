@@ -15,12 +15,6 @@ interface Group {
   targetSize: number;
 }
 
-interface PendingChild {
-  id: number;
-  name: string;
-  gender: string;
-}
-
 export default function GroupMakerTool() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState('boy');
@@ -28,8 +22,6 @@ export default function GroupMakerTool() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [numGroups, setNumGroups] = useState(3);
   const [groupSizes, setGroupSizes] = useState<number[]>([4, 4, 4]);
-  const [pendingChildren, setPendingChildren] = useState<PendingChild[]>([]);
-  const [showGenderModal, setShowGenderModal] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportFileInputRef = useRef<HTMLInputElement>(null);
