@@ -47,6 +47,9 @@ export default function GroupMakerTool() {
   // Client-side mounting check
   const [mounted, setMounted] = useState(false);
 
+  // Ref for scrolling to groups
+  const groupsRef = useRef<HTMLDivElement>(null);
+
   // Load saved data on component mount
   useEffect(() => {
     const savedChildren = localStorage.getItem('groupMakerChildren');
@@ -384,6 +387,14 @@ export default function GroupMakerTool() {
 
     setGroups(newGroups);
     alert('Groups generated successfully!');
+    
+    // Scroll to groups section after a brief delay to allow the DOM to update
+    setTimeout(() => {
+      groupsRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
   };
 
   const getTotalTargetSize = () => {
@@ -1006,7 +1017,7 @@ export default function GroupMakerTool() {
 
       {/* Generated Groups Display */}
       {groups.length > 0 && (
-        <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+        <div ref={groupsRef} className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-green-700">🎯 Generated Groups</h2>
             <div className="flex gap-2 flex-wrap">
