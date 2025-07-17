@@ -397,6 +397,51 @@ export default function GroupMakerTool() {
     }, 100);
   };
 
+  const remixGroups = () => {
+    if (groups.length === 0) {
+      alert('Please generate groups first.');
+      return;
+    }
+
+    // Shuffle the children array to get different results
+    const shuffledChildren = [...children].sort(() => Math.random() - 0.5);
+    
+    const newGroups: Group[] = [];
+    
+    // Initialize empty groups with same settings
+    for (let i = 0; i < numGroups; i++) {
+      newGroups.push({
+        id: i,
+        children: [],
+        targetSize: groupSizes[i]
+      });
+    }
+
+    // Distribute shuffled children
+    let currentGroup = 0;
+    while (shuffledChildren.length > 0) {
+      const child = shuffledChildren.shift()!;
+      
+      if (newGroups[currentGroup].children.length < newGroups[currentGroup].targetSize) {
+        newGroups[currentGroup].children.push(child);
+      } else {
+        currentGroup = (currentGroup + 1) % numGroups;
+        newGroups[currentGroup].children.push(child);
+      }
+    }
+
+    setGroups(newGroups);
+    alert('Groups remixed successfully!');
+    
+    // Scroll to groups section
+    setTimeout(() => {
+      groupsRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
+  };
+
   const getTotalTargetSize = () => {
     return groupSizes.reduce((sum, size) => sum + size, 0);
   };
