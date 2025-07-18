@@ -353,7 +353,7 @@ export default function GroupMakerTool() {
     setShowEditModal(true);
   };
 
-  const generateGroups = () => {
+  const generateGroups = (isRemix = false) => {
     if (children.length === 0) {
       alert('Please add some children first.');
       return;
@@ -370,12 +370,15 @@ export default function GroupMakerTool() {
       });
     }
 
-    const remainingChildren = [...children];
+    // If it's a remix, shuffle the children for different results
+    const childrenToDistribute = isRemix 
+      ? [...children].sort(() => Math.random() - 0.5)
+      : [...children];
 
-    // Simple distribution for now
+    // Simple distribution
     let currentGroup = 0;
-    while (remainingChildren.length > 0) {
-      const child = remainingChildren.shift()!;
+    while (childrenToDistribute.length > 0) {
+      const child = childrenToDistribute.shift()!;
       
       if (newGroups[currentGroup].children.length < newGroups[currentGroup].targetSize) {
         newGroups[currentGroup].children.push(child);
@@ -386,54 +389,9 @@ export default function GroupMakerTool() {
     }
 
     setGroups(newGroups);
-    alert('Groups generated successfully!');
+    alert(isRemix ? 'Groups remixed successfully!' : 'Groups generated successfully!');
     
     // Scroll to groups section after a brief delay to allow the DOM to update
-    setTimeout(() => {
-      groupsRef.current?.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
-      });
-    }, 100);
-  };
-
-  const remixGroups = () => {
-    if (groups.length === 0) {
-      alert('Please generate groups first.');
-      return;
-    }
-
-    // Shuffle the children array to get different results
-    const shuffledChildren = [...children].sort(() => Math.random() - 0.5);
-    
-    const newGroups: Group[] = [];
-    
-    // Initialize empty groups with same settings
-    for (let i = 0; i < numGroups; i++) {
-      newGroups.push({
-        id: i,
-        children: [],
-        targetSize: groupSizes[i]
-      });
-    }
-
-    // Distribute shuffled children
-    let currentGroup = 0;
-    while (shuffledChildren.length > 0) {
-      const child = shuffledChildren.shift()!;
-      
-      if (newGroups[currentGroup].children.length < newGroups[currentGroup].targetSize) {
-        newGroups[currentGroup].children.push(child);
-      } else {
-        currentGroup = (currentGroup + 1) % numGroups;
-        newGroups[currentGroup].children.push(child);
-      }
-    }
-
-    setGroups(newGroups);
-    alert('Groups remixed successfully!');
-    
-    // Scroll to groups section
     setTimeout(() => {
       groupsRef.current?.scrollIntoView({ 
         behavior: 'smooth', 
