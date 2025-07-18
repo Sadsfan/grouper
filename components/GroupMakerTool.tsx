@@ -397,6 +397,7 @@ export default function GroupMakerTool() {
     }, 100);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const remixGroups = () => {
     if (children.length === 0) {
       alert('Please add some children first.');
