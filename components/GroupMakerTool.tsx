@@ -370,12 +370,13 @@ export default function GroupMakerTool() {
       });
     }
 
-    const remainingChildren = [...children];
+    // Always shuffle children for random distribution
+    const shuffledChildren = [...children].sort(() => Math.random() - 0.5);
 
-    // Simple distribution
+    // Simple distribution with shuffled children
     let currentGroup = 0;
-    while (remainingChildren.length > 0) {
-      const child = remainingChildren.shift()!;
+    while (shuffledChildren.length > 0) {
+      const child = shuffledChildren.shift()!;
       
       if (newGroups[currentGroup].children.length < newGroups[currentGroup].targetSize) {
         newGroups[currentGroup].children.push(child);
@@ -404,43 +405,8 @@ export default function GroupMakerTool() {
       return;
     }
 
-    const newGroups: Group[] = [];
-    
-    // Initialize empty groups
-    for (let i = 0; i < numGroups; i++) {
-      newGroups.push({
-        id: i,
-        children: [],
-        targetSize: groupSizes[i]
-      });
-    }
-
-    // Shuffle the children for different results
-    const shuffledChildren = [...children].sort(() => Math.random() - 0.5);
-
-    // Simple distribution
-    let currentGroup = 0;
-    while (shuffledChildren.length > 0) {
-      const child = shuffledChildren.shift()!;
-      
-      if (newGroups[currentGroup].children.length < newGroups[currentGroup].targetSize) {
-        newGroups[currentGroup].children.push(child);
-      } else {
-        currentGroup = (currentGroup + 1) % numGroups;
-        newGroups[currentGroup].children.push(child);
-      }
-    }
-
-    setGroups(newGroups);
-    alert('Groups remixed successfully!');
-    
-    // Scroll to groups section
-    setTimeout(() => {
-      groupsRef.current?.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
-      });
-    }, 100);
+    // Just call generateGroups since it already shuffles
+    generateGroups();
   };
 
   const getTotalTargetSize = () => {
@@ -891,14 +857,24 @@ export default function GroupMakerTool() {
             </div>
           </div>
 
-          <div className="mt-6">
+          <div className="mt-6 flex gap-3 flex-wrap">
             <button
               onClick={generateGroups}
-              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
+              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold transition-colors"
               disabled={children.length === 0}
             >
               🎲 Generate Groups
             </button>
+            
+            {groups.length > 0 && (
+              <button
+                onClick={() => remixGroups()}
+                className="px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                title="Remix groups with same settings"
+              >
+                🔄 Remix
+              </button>
+            )}
           </div>
         </div>
       )}
